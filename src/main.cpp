@@ -44,7 +44,7 @@ void sendMessage(String outgoing) {
   while (!LoRa.beginPacket()) {
   }
   LoRa.print(outgoing);                 // add payload
-  LoRa.endPacket(true);                 // finish packet and send it
+  LoRa.endPacket(false);                 // finish packet and send it
 }
 
 void onReceive(int packetSize) {
@@ -53,7 +53,6 @@ void onReceive(int packetSize) {
   while (LoRa.available()) {            // can't use readString() in callback, so
     incoming += (char)LoRa.read();      // add bytes one by one
   }
-  LoRa.receive();
   if (!loraRX && getValue(incoming,',',0) == "ADS-RC") {
     //for (int i = 0; i < 8; i++) { }
     loraMsg = getValue(incoming,',',1);
@@ -102,7 +101,7 @@ int initDisplay () {
   Serial.println("- OK");
   return 1;
 }
-
+// ----------------------------------------------------------------------------- MSP
 int initMSP () {
   Serial.print("MSP ");
   display.drawString (0, 8, "MSP ");
@@ -117,9 +116,33 @@ int initMSP () {
 }
 // ----------------------------------------------------------------------------- main init
 void setup() {
-  // put your setup code here, to run once:
+  initDisplay();
+  initMSP();
+  initLora();
+
+// ----------------------------------------------------------------------------- msp set nav point
+  msp_set_wp_t wp;
+  wp.waypointNumber = 1;
+  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+  wp.lat = 501006770;
+  wp.lon = 87613380;
+  wp.alt = 500;
+  wp.p1 = 0;
+  wp.p2 = 0;
+  wp.p3 = 0;
+  wp.flag = 0xa5;
+  msp.command(MSP_SET_WP, &wp, sizeof(wp));
+// ----------------------------------------------------------------------------- msp get gps
+  msp_raw_gps_t gps;
+  if (msp.request(MSP_RAW_GPS, &gps, sizeof(gps))) {
+    int32_t lat     = gps.lat;
+    int32_t lon    = gps.lon;
+    int16_t alt      = gps.alt;
+    int16_t groundSpeed = gps.groundSpeed;
+  }
+
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  LoRa.receive();
 }
