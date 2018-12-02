@@ -4,6 +4,28 @@
 #include <Arduino.h>
 #include <esp_system.h>
 
+const uint8_t activeSymbol[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00011000,
+    B00100100,
+    B01000010,
+    B01000010,
+    B00100100,
+    B00011000
+};
+
+const uint8_t inactiveSymbol[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00011000,
+    B00011000,
+    B00000000,
+    B00000000
+};
+
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
 #define MOSI 27 // GPIO27 - SX1278's MOSI
@@ -19,9 +41,23 @@ SSD1306 display (0x3c, 4, 15);
 
 MSP msp;
 
+int sendInterval = 500;
+long sendLastTime = 0;
+int displayInterval = 100;
+long displayLastTime = 0;
+
+
 bool loraRX = 0; // new packet flag
 String loraMsg;
 byte loraAddress = 0x01; // our uniq loraAddress
+
+struct planeData {
+  char planeName[20];
+  char planeFC[20];
+  bool armState;
+  msp_raw_gps_t gps;
+};
+planeData pd;
 
 // ----------------------------------------------------------------------------- String seperator split
 String getValue(String data, char separator, int index) {
@@ -61,13 +97,13 @@ void onReceive(int packetSize) {
 }
 
 void initLora() {
-	display.drawString (0, 16, "LORA");
+	display.drawString (0, 24, "LORA");
   display.display();
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
   if (!LoRa.begin(BAND)) {
     Serial.println("Starting LoRa failed!");
-    display.drawString (94, 16, "FAIL");
+    display.drawString (94, 24, "FAIL");
     while (1);
   }
   LoRa.sleep();
@@ -79,7 +115,27 @@ void initLora() {
   LoRa.enableCrc();
   LoRa.receive();
   Serial.print("- OK");
-  display.drawString (100, 16, "OK");
+  display.drawString (100, 24, "OK");
+  display.display();
+}
+// ----------------------------------------------------------------------------- Display
+void drawDisplay () {
+  display.clear();
+  display.setTextAlignment (TEXT_ALIGN_LEFT);
+  display.drawString (0,54, "Disarmed");
+  display.drawString (48,54, "15 Sat");
+  display.drawString (84,54, "TX");
+  display.drawString (106,54, "RX");
+
+  display.drawXbm(98, 55, 8, 8, activeSymbol);
+  display.drawXbm(120, 55, 8, 8, inactiveSymbol);
+
+  display.drawString (0,0, "Camille");
+  display.drawString (0,8, "Daniel");
+
+  display.setTextAlignment (TEXT_ALIGN_RIGHT);
+  display.drawString (128,0, "1,2km A");
+  display.drawString (128,8, "5m A");
   display.display();
 }
 
@@ -99,7 +155,31 @@ void initDisplay () {
   display.display();
   Serial.println("- OK");
 }
-// ----------------------------------------------------------------------------- MSP
+// ----------------------------------------------------------------------------- MSP and FC
+void getPlanetArmed () {
+  uint32_t planeModes;
+  msp.getActiveModes(&planeModes);
+  Serial.print("Arm State: ");
+  Serial.println(bitRead(planeModes,0));
+}
+
+void getPlaneGPS () {
+  if (msp.request(MSP_RAW_GPS, &pd.gps, sizeof(pd.gps))) {
+    Serial.println(pd.gps.fixType);
+    Serial.println(pd.gps.numSat);
+  }
+}
+
+void getPlaneData () {
+  if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
+    Serial.println(pd.planeName);
+  }
+  char planeFC[20];
+  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
+    Serial.println(pd.planeFC);
+  }
+
+}
 void initMSP () {
   Serial.print("MSP ");
   display.drawString (0, 8, "MSP ");
@@ -110,14 +190,16 @@ void initMSP () {
   Serial.println("- OK");
   display.drawString (100, 8, "OK");
   display.display();
-}
-
-void getPlaneName () {
-  char planeName[20];
-  if (msp.request(10, &planeName, sizeof(planeName))) {
-
-    Serial.println(planeName);
-  }
+  Serial.print("FC ");
+  display.drawString (0, 16, "FC ");
+  display.display();
+  delay(200);
+  getPlaneData();
+  getPlanetArmed();
+  getPlaneGPS();
+  Serial.println("- OK");
+  display.drawString (100, 16, "OK");
+  display.display();
 }
 
 // ----------------------------------------------------------------------------- main init
@@ -126,13 +208,9 @@ void setup() {
   initDisplay();
   initMSP();
   initLora();
-  delay(1000);
 
-  getPlaneName();
-  uint32_t planeModes;
-  msp.getActiveModes(&planeModes);
-  Serial.print("Arm State: ");
-  Serial.println(bitRead(planeModes,0));
+
+
 /*
 // ----------------------------------------------------------------------------- msp set nav point
   msp_set_wp_t wp;
@@ -147,17 +225,18 @@ void setup() {
   wp.flag = 0xa5;
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
 // ----------------------------------------------------------------------------- msp get gps
-  msp_raw_gps_t gps;
-  if (msp.request(MSP_RAW_GPS, &gps, sizeof(gps))) {
-    int32_t lat     = gps.lat;
-    int32_t lon    = gps.lon;
-    int16_t alt      = gps.alt;
-    int16_t groundSpeed = gps.groundSpeed;
-    Serial.println(gps.numSat);
-  }
+
 */
 }
 
 void loop() {
-  //LoRa.receive();
+  if (millis() - displayLastTime > displayInterval) {
+    drawDisplay();
+    displayLastTime = millis();
+  }
+
+  if (millis() - sendLastTime > sendInterval) {
+
+    sendLastTime = millis();
+  }
 }
