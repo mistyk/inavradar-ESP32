@@ -60,7 +60,7 @@ void onReceive(int packetSize) {
   }
 }
 
-int initLora() {
+void initLora() {
 	display.drawString (0, 16, "LORA");
   display.display();
   SPI.begin(5, 19, 27, 18);
@@ -81,10 +81,9 @@ int initLora() {
   Serial.print("- OK");
   display.drawString (100, 16, "OK");
   display.display();
-  return 1;
 }
 
-int initDisplay () {
+void initDisplay () {
   Serial.print("Display ");
   pinMode (16, OUTPUT);
   pinMode (2, OUTPUT);
@@ -99,10 +98,9 @@ int initDisplay () {
   display.drawString (100, 0, "OK");
   display.display();
   Serial.println("- OK");
-  return 1;
 }
 // ----------------------------------------------------------------------------- MSP
-int initMSP () {
+void initMSP () {
   Serial.print("MSP ");
   display.drawString (0, 8, "MSP ");
   display.display();
@@ -112,14 +110,30 @@ int initMSP () {
   Serial.println("- OK");
   display.drawString (100, 8, "OK");
   display.display();
-  return 1;
 }
+
+void getPlaneName () {
+  char planeName[20];
+  if (msp.request(10, &planeName, sizeof(planeName))) {
+
+    Serial.println(planeName);
+  }
+}
+
 // ----------------------------------------------------------------------------- main init
 void setup() {
+  Serial.begin(115200);
   initDisplay();
   initMSP();
   initLora();
+  delay(1000);
 
+  getPlaneName();
+  uint32_t planeModes;
+  msp.getActiveModes(&planeModes);
+  Serial.print("Arm State: ");
+  Serial.println(bitRead(planeModes,0));
+/*
 // ----------------------------------------------------------------------------- msp set nav point
   msp_set_wp_t wp;
   wp.waypointNumber = 1;
@@ -139,10 +153,11 @@ void setup() {
     int32_t lon    = gps.lon;
     int16_t alt      = gps.alt;
     int16_t groundSpeed = gps.groundSpeed;
+    Serial.println(gps.numSat);
   }
-
+*/
 }
 
 void loop() {
-  LoRa.receive();
+  //LoRa.receive();
 }
