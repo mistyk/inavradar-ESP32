@@ -122,8 +122,8 @@ void initLora() {
 void drawDisplay () {
   display.clear();
   display.setTextAlignment (TEXT_ALIGN_LEFT);
-  display.drawString (0,54, "Disarmed");
-  display.drawString (48,54, "15 Sat");
+  display.drawString (0,54, pd.armState ? "Armed" : "Disarmed");
+  display.drawString (48,54, pd.gps.fixType ? pd.gps.numSat + " Sat" : "no fix");
   display.drawString (84,54, "TX");
   display.drawString (106,54, "RX");
 
@@ -132,10 +132,10 @@ void drawDisplay () {
 
   display.drawString (0,0, "Camille");
   display.drawString (0,8, "Daniel");
-
   display.setTextAlignment (TEXT_ALIGN_RIGHT);
   display.drawString (128,0, "1,2km A");
   display.drawString (128,8, "5m A");
+
   display.display();
 }
 
@@ -180,36 +180,6 @@ void getPlaneData () {
   }
 
 }
-void initMSP () {
-  Serial.print("MSP ");
-  display.drawString (0, 8, "MSP ");
-  display.display();
-  delay(200);
-  Serial1.begin(115200, SERIAL_8N1, rxPin , txPin);
-  msp.begin(Serial1);
-  Serial.println("- OK");
-  display.drawString (100, 8, "OK");
-  display.display();
-  Serial.print("FC ");
-  display.drawString (0, 16, "FC ");
-  display.display();
-  delay(200);
-  getPlaneData();
-  getPlanetArmed();
-  getPlaneGPS();
-  Serial.println("- OK");
-  display.drawString (100, 16, "OK");
-  display.display();
-}
-
-// ----------------------------------------------------------------------------- main init
-void setup() {
-  Serial.begin(115200);
-  initDisplay();
-  initMSP();
-  initLora();
-
-
 
 /*
 // ----------------------------------------------------------------------------- msp set nav point
@@ -227,8 +197,41 @@ void setup() {
 // ----------------------------------------------------------------------------- msp get gps
 
 */
+
+void initMSP () {
+  Serial.print("MSP ");
+  display.drawString (0, 8, "MSP ");
+  display.display();
+  delay(200);
+  Serial1.begin(115200, SERIAL_8N1, rxPin , txPin);
+  msp.begin(Serial1);
+  Serial.println("- OK");
+  display.drawString (100, 8, "OK");
+  display.display();
+  Serial.print("FC ");
+  display.drawString (0, 16, "FC ");
+  display.display();
+  delay(200);
+  getPlaneData();
+  getPlanetArmed();
+  getPlaneGPS();
+  Serial.print("- ");
+  Serial.print(pd.planeFC);
+  display.drawString (100, 16, pd.planeFC);
+  display.display();
 }
 
+// ----------------------------------------------------------------------------- main init
+void setup() {
+  Serial.begin(115200);
+  initDisplay();
+  initMSP();
+  initLora();
+
+
+  delay(2000);
+}
+// ----------------------------------------------------------------------------- main loop
 void loop() {
   if (millis() - displayLastTime > displayInterval) {
     drawDisplay();
