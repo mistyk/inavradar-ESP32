@@ -46,6 +46,10 @@ long sendLastTime = 0;
 int displayInterval = 100;
 long displayLastTime = 0;
 
+struct testS {
+  String header;
+};
+
 struct planeData {
   String header;
   byte loraAddress;
@@ -86,25 +90,32 @@ String getValue(String data, char separator, int index) {
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 // ----------------------------------------------------------------------------- LoRa
-void sendMessage(planeData outgoing) {
+testS tester1;
+
+testS tester2;
+void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
-  char outgoing2[sizeof(pd)];
-  memcpy(outgoing2, &outgoing, sizeof(pd));
-  LoRa.print(outgoing2);
+  LoRa.write((uint8_t*)outgoing, sizeof(outgoing));
+/*  char outgoing2[sizeof(outgoing)];
+  memcpy(outgoing2, &outgoing, sizeof(outgoing));
+  LoRa.print(outgoing2);*/
   //LoRa.print(outgoing);                 // add payload
   LoRa.endPacket(false);                 // finish packet and send it
 }
 
 void onReceive(int packetSize) {
   if (packetSize == 0) return;          // if there's no packet, return
-  char incoming[sizeof(pd2)];                 // payload of packet
+LoRa.readBytes((uint8_t *)&pd2, packetSize);
+/*
+  char incoming[sizeof(tester1)];                 // payload of packet
   int c = 0;
   while (LoRa.available()) {            // can't use readString() in callback, so
     incoming[c] = (char)LoRa.read();      // add bytes one by one
+
     c++;
   }
-
-  memcpy(&pd2, incoming, sizeof(pd2));
+*/
+  //memcpy(&tester2, incoming, sizeof(tester1));
   Serial.println(pd2.header);
 
   //if (!loraRX && pd2.header == "ADS-RC") {
@@ -260,8 +271,7 @@ void setup() {
 
 
   delay(2000);
-
-
+tester1.header = "bla";
 
   //planeSetWP();
 
@@ -278,7 +288,7 @@ void loop() {
   if (millis() - sendLastTime > sendInterval) {
     getPlaneGPS();
     loraTX = 1;
-    sendMessage(pd);
+    sendMessage(&pd);
     LoRa.receive();
     sendLastTime = millis();
   }
