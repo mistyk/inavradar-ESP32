@@ -46,18 +46,28 @@ long sendLastTime = 0;
 int displayInterval = 100;
 long displayLastTime = 0;
 
-
-bool loraRX = 0; // new packet flag
-String loraMsg;
-byte loraAddress = 0x01; // our uniq loraAddress
-
 struct planeData {
+  String header;
+  byte loraAddress;
   char planeName[20];
-  char planeFC[20];
+  //char planeFC[20];
   bool armState;
   msp_raw_gps_t gps;
 };
+struct planesData {
+  uint8_t waypointNumber;
+  long lastUpdate;
+  planeData pd;
+};
 planeData pd;
+planeData pd2;
+planesData pds[5];
+
+bool loraRX = 0; // new packet flag
+bool loraTX = 0;
+planeData loraMsg;
+byte loraAddress = 0x01; // our uniq loraAddress
+
 
 // ----------------------------------------------------------------------------- String seperator split
 String getValue(String data, char separator, int index) {
@@ -76,29 +86,39 @@ String getValue(String data, char separator, int index) {
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 // ----------------------------------------------------------------------------- LoRa
-void sendMessage(String outgoing) {
-  while (!LoRa.beginPacket()) {
+void sendMessage(struct planeData const *outgoing) {
+  while (!LoRa.beginPacket()) {  }
+  unsigned char const * ptr = (unsigned char const *)outgoing;
+  for (size_t i = 1; i < sizeof(*outgoing); ++i) {
+    LoRa.write(*ptr);
+    ++ptr;
   }
-  LoRa.print(outgoing);                 // add payload
+  //LoRa.print(outgoing);                 // add payload
   LoRa.endPacket(false);                 // finish packet and send it
 }
 
 void onReceive(int packetSize) {
   if (packetSize == 0) return;          // if there's no packet, return
-  String incoming = "";                 // payload of packet
+  char incoming[sizeof(planeData)];                 // payload of packet
+  int c = 0;
   while (LoRa.available()) {            // can't use readString() in callback, so
-    incoming += (char)LoRa.read();      // add bytes one by one
+    incoming[c] = (char)LoRa.read();      // add bytes one by one
+    c++;
   }
-  if (!loraRX && getValue(incoming,',',0) == "ADS-RC") {
+  loraRX = 1;
+  memcpy(incoming, &pd2, sizeof(planeData));
+  if (!loraRX && pd2.header == "ADS-RC") {
     //for (int i = 0; i < 8; i++) { }
-    loraMsg = getValue(incoming,',',1);
-    loraRX = 1;
+    //loraMsg = incoming;
+
   }
 }
 
 void initLora() {
 	display.drawString (0, 24, "LORA");
   display.display();
+  pd.loraAddress = loraAddress;
+  pd.header = "ADS-RC";
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
   if (!LoRa.begin(BAND)) {
@@ -127,8 +147,8 @@ void drawDisplay () {
   display.drawString (84,54, "TX");
   display.drawString (106,54, "RX");
 
-  display.drawXbm(98, 55, 8, 8, activeSymbol);
-  display.drawXbm(120, 55, 8, 8, inactiveSymbol);
+  display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
+  display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
 
   display.drawString (0,0, "Camille");
   display.drawString (0,8, "Daniel");
@@ -174,29 +194,39 @@ void getPlaneData () {
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
     Serial.println(pd.planeName);
   }
-  char planeFC[20];
-  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
-    Serial.println(pd.planeFC);
-  }
-
+//  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
+//    Serial.println(pd.planeFC);
+//  }
 }
 
-/*
-// ----------------------------------------------------------------------------- msp set nav point
+void planeSetWP () {
   msp_set_wp_t wp;
-  wp.waypointNumber = 1;
+  for (size_t i = 0; i < 4; i++) {
+
+    wp.waypointNumber = 100+i;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 501006770;
+    wp.lon = 87613380;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
+  }
+
+  wp.waypointNumber = 104;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
   wp.lat = 501006770;
-  wp.lon = 87613380;
+  wp.lon = 87613580;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
   wp.p3 = 0;
   wp.flag = 0xa5;
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
-// ----------------------------------------------------------------------------- msp get gps
 
-*/
+}
 
 void initMSP () {
   Serial.print("MSP ");
@@ -215,12 +245,10 @@ void initMSP () {
   getPlaneData();
   getPlanetArmed();
   getPlaneGPS();
-  Serial.print("- ");
-  Serial.print(pd.planeFC);
-  display.drawString (100, 16, pd.planeFC);
+  Serial.println("- OK");
+  display.drawString (100, 16, "OK");
   display.display();
 }
-
 // ----------------------------------------------------------------------------- main init
 void setup() {
   Serial.begin(115200);
@@ -229,17 +257,28 @@ void setup() {
   initLora();
 
 
+
   delay(2000);
+
+
+
+  //planeSetWP();
+
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
   if (millis() - displayLastTime > displayInterval) {
     drawDisplay();
+    loraTX = 0;
+    loraRX = 0;
     displayLastTime = millis();
   }
 
   if (millis() - sendLastTime > sendInterval) {
-
+    getPlaneGPS();
+    loraTX = 1;
+    sendMessage(&pd);
+    LoRa.receive();
     sendLastTime = millis();
   }
 }
