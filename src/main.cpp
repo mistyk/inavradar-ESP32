@@ -88,8 +88,8 @@ String getValue(String data, char separator, int index) {
 // ----------------------------------------------------------------------------- LoRa
 void sendMessage(planeData outgoing) {
   while (!LoRa.beginPacket()) {  }
-  char outgoing2[sizeof(planeData)];
-  memcpy(outgoing2, &outgoing, sizeof(outgoing));
+  char outgoing2[sizeof(pd)];
+  memcpy(outgoing2, &outgoing, sizeof(pd));
   LoRa.print(outgoing2);
   //LoRa.print(outgoing);                 // add payload
   LoRa.endPacket(false);                 // finish packet and send it
@@ -97,7 +97,7 @@ void sendMessage(planeData outgoing) {
 
 void onReceive(int packetSize) {
   if (packetSize == 0) return;          // if there's no packet, return
-  char incoming[sizeof(planeData)];                 // payload of packet
+  char incoming[sizeof(pd2)];                 // payload of packet
   int c = 0;
   while (LoRa.available()) {            // can't use readString() in callback, so
     incoming[c] = (char)LoRa.read();      // add bytes one by one
@@ -107,11 +107,11 @@ void onReceive(int packetSize) {
   memcpy(&pd2, incoming, sizeof(pd2));
   Serial.println(pd2.header);
 
-  if (!loraRX && pd2.header == "ADS-RC") {
+  //if (!loraRX && pd2.header == "ADS-RC") {
     //for (int i = 0; i < 8; i++) { }
     //loraMsg = incoming;
     loraRX = 1;
-  }
+  //}
 
 }
 
