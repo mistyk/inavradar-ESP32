@@ -89,9 +89,8 @@ String getValue(String data, char separator, int index) {
 void sendMessage(planeData outgoing) {
   while (!LoRa.beginPacket()) {  }
   char outgoing2[sizeof(planeData)];
-  memcpy(&outgoing, &outgoing2, sizeof(planeData));
+  memcpy(outgoing2, &outgoing, sizeof(outgoing));
   LoRa.print(outgoing2);
-
   //LoRa.print(outgoing);                 // add payload
   LoRa.endPacket(false);                 // finish packet and send it
 }
@@ -104,10 +103,9 @@ void onReceive(int packetSize) {
     incoming[c] = (char)LoRa.read();      // add bytes one by one
     c++;
   }
-  Serial.println(incoming);
-  memcpy(incoming, &pd2, sizeof(planeData));
 
-
+  memcpy(&pd2, incoming, sizeof(pd2));
+  Serial.println(pd2.header);
 
   if (!loraRX && pd2.header == "ADS-RC") {
     //for (int i = 0; i < 8; i++) { }
