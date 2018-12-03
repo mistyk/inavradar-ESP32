@@ -86,13 +86,12 @@ String getValue(String data, char separator, int index) {
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 // ----------------------------------------------------------------------------- LoRa
-void sendMessage(struct planeData const *outgoing) {
+void sendMessage(planeData outgoing) {
   while (!LoRa.beginPacket()) {  }
-  unsigned char const * ptr = (unsigned char const *)outgoing;
-  for (size_t i = 1; i < sizeof(*outgoing); ++i) {
-    LoRa.write(*ptr);
-    ++ptr;
-  }
+  char outgoing2[sizeof(planeData)];
+  memcpy(&outgoing, &outgoing2, sizeof(planeData));
+  LoRa.print(outgoing2);
+
   //LoRa.print(outgoing);                 // add payload
   LoRa.endPacket(false);                 // finish packet and send it
 }
@@ -105,13 +104,17 @@ void onReceive(int packetSize) {
     incoming[c] = (char)LoRa.read();      // add bytes one by one
     c++;
   }
-  loraRX = 1;
+  Serial.println(incoming);
   memcpy(incoming, &pd2, sizeof(planeData));
+
+
+
   if (!loraRX && pd2.header == "ADS-RC") {
     //for (int i = 0; i < 8; i++) { }
     //loraMsg = incoming;
-
+    loraRX = 1;
   }
+
 }
 
 void initLora() {
@@ -277,7 +280,7 @@ void loop() {
   if (millis() - sendLastTime > sendInterval) {
     getPlaneGPS();
     loraTX = 1;
-    sendMessage(&pd);
+    sendMessage(pd);
     LoRa.receive();
     sendLastTime = millis();
   }
