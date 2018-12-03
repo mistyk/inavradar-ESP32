@@ -89,34 +89,16 @@ String getValue(String data, char separator, int index) {
 void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
   LoRa.write((uint8_t*)outgoing, sizeof(pd));
-/*  char outgoing2[sizeof(outgoing)];
-  memcpy(outgoing2, &outgoing, sizeof(outgoing));
-  LoRa.print(outgoing2);*/
-  //LoRa.print(outgoing);                 // add payload
-  LoRa.endPacket(false);                 // finish packet and send it
+  LoRa.endPacket(false);
 }
 
 void onReceive(int packetSize) {
-  if (packetSize == 0) return;          // if there's no packet, return
-LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
-/*
-  char incoming[sizeof(tester1)];                 // payload of packet
-  int c = 0;
-  while (LoRa.available()) {            // can't use readString() in callback, so
-    incoming[c] = (char)LoRa.read();      // add bytes one by one
-
-    c++;
+  if (packetSize == 0) return;
+  LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
+  Serial.println(loraMsg.planeName);
+  if (!loraRX && loraMsg.header == "ADS-RC") {
+      loraRX = 1;
   }
-*/
-  //memcpy(&tester2, incoming, sizeof(tester1));
-  Serial.println(loraMsg.header);
-
-  //if (!loraRX && pd2.header == "ADS-RC") {
-    //for (int i = 0; i < 8; i++) { }
-    //loraMsg = incoming;
-    loraRX = 1;
-  //}
-
 }
 
 void initLora() {
@@ -148,7 +130,7 @@ void drawDisplay () {
   display.clear();
   display.setTextAlignment (TEXT_ALIGN_LEFT);
   display.drawString (0,54, pd.armState ? "Armed" : "Disarmed");
-  display.drawString (48,54, pd.gps.fixType ? pd.gps.numSat + " Sat" : "no fix");
+  display.drawString (48,54, pd.gps.fixType ? String(pd.gps.numSat) + " Sat" : "no fix");
   display.drawString (84,54, "TX");
   display.drawString (106,54, "RX");
 
@@ -206,21 +188,49 @@ void getPlaneData () {
 
 void planeSetWP () {
   msp_set_wp_t wp;
-  for (size_t i = 0; i < 4; i++) {
 
-    wp.waypointNumber = 100+i;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 501006770;
-    wp.lon = 87613380;
-    wp.alt = 500;
-    wp.p1 = 0;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-  }
+  wp.waypointNumber = 1;
+  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+  wp.lat = 501006770;
+  wp.lon = 87613380;
+  wp.alt = 500;
+  wp.p1 = 0;
+  wp.p2 = 0;
+  wp.p3 = 0;
+  wp.flag = 0;
+  msp.command(MSP_SET_WP, &wp, sizeof(wp));
+  wp.waypointNumber = 2;
+  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+  wp.lat = 501020320;
+  wp.lon = 87615830;
+  wp.alt = 500;
+  wp.p1 = 0;
+  wp.p2 = 0;
+  wp.p3 = 0;
+  wp.flag = 0;
+  msp.command(MSP_SET_WP, &wp, sizeof(wp));
+  wp.waypointNumber = 3;
+  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+  wp.lat = 501046770;
+  wp.lon = 87613380;
+  wp.alt = 500;
+  wp.p1 = 0;
+  wp.p2 = 0;
+  wp.p3 = 0;
+  wp.flag = 0;
+  msp.command(MSP_SET_WP, &wp, sizeof(wp));
+  wp.waypointNumber = 4;
+  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+  wp.lat = 501006770;
+  wp.lon = 87614380;
+  wp.alt = 500;
+  wp.p1 = 0;
+  wp.p2 = 0;
+  wp.p3 = 0;
+  wp.flag = 0;
+  msp.command(MSP_SET_WP, &wp, sizeof(wp));
 
-  wp.waypointNumber = 104;
+  wp.waypointNumber = 5;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
   wp.lat = 501006770;
   wp.lon = 87613580;
@@ -265,7 +275,7 @@ void setup() {
 
   delay(2000);
 
-  //planeSetWP();
+  planeSetWP();
 
 }
 // ----------------------------------------------------------------------------- main loop
