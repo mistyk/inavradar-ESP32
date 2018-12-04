@@ -1,0 +1,84 @@
+# INAV/MATEKF405 2.0.1 Dec  3 2018 / 22:25:38 (98d6e79)
+
+# resources
+
+# mixer
+mmix 0  1.000 -1.000  1.000 -1.000
+mmix 1  1.000 -1.000 -1.000  1.000
+mmix 2  1.000  1.000  1.000  1.000
+mmix 3  1.000  1.000 -1.000 -1.000
+
+# servo mix
+
+# servo
+
+# feature
+feature MOTOR_STOP
+feature GPS
+feature PWM_OUTPUT_ENABLE
+
+# beeper
+
+# map
+
+# serial
+serial 0 576 115200 38400 115200 115200
+serial 1 0 115200 38400 115200 115200
+serial 3 2 115200 38400 0 115200
+serial 4 1 115200 38400 0 115200
+
+# led
+
+# color
+
+# mode_color
+
+# aux
+aux 0 0 0 1975 2025
+
+# adjrange
+
+# rxrange
+
+# osd_layout
+osd_layout 0 0 23 0 H
+osd_layout 0 1 25 11 V
+osd_layout 0 3 8 6 H
+osd_layout 0 4 8 6 H
+osd_layout 0 7 12 12 H
+osd_layout 0 9 1 2 H
+osd_layout 0 11 1 3 H
+osd_layout 0 12 1 4 H
+osd_layout 0 14 25 10 V
+osd_layout 0 15 1 0 H
+osd_layout 0 20 15 0 V
+osd_layout 0 21 4 0 V
+osd_layout 0 28 23 11 H
+osd_layout 0 30 1 1 V
+osd_layout 0 45 0 0 V
+
+# master
+set acc_hardware = MPU6500
+set acczero_x = -13
+set acczero_y = -10
+set acczero_z = -32
+set accgain_x = 4085
+set accgain_y = 4085
+set accgain_z = 4104
+set mag_hardware = NONE
+set baro_hardware = NONE
+set pitot_hardware = NONE
+set serialrx_provider = IBUS
+set min_throttle = 1065
+set motor_pwm_rate = 2000
+set motor_pwm_protocol = MULTISHOT
+set model_preview_type = 3
+set gps_sbas_mode = EGNOS
+set name = Daniel
+
+# profile
+profile 1
+
+
+# battery_profile
+battery_profile 1

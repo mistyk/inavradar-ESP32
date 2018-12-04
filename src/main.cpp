@@ -191,8 +191,8 @@ void planeSetWP () {
 
   wp.waypointNumber = 1;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 501006770;
-  wp.lon = 87613380;
+  wp.lat = 50.1006770 * 10000000;
+  wp.lon = 8.7613380 * 10000000;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
@@ -201,8 +201,8 @@ void planeSetWP () {
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
   wp.waypointNumber = 2;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 501020320;
-  wp.lon = 87615830;
+  wp.lat = 50.1020320 * 10000000;
+  wp.lon = 8.7615830 * 10000000;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
@@ -211,8 +211,8 @@ void planeSetWP () {
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
   wp.waypointNumber = 3;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 501046770;
-  wp.lon = 87613380;
+  wp.lat = 50.102137 * 10000000;
+  wp.lon = 8.762990 * 10000000;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
@@ -221,8 +221,8 @@ void planeSetWP () {
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
   wp.waypointNumber = 4;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 501006770;
-  wp.lon = 87614380;
+  wp.lat = 50.100547 * 10000000;
+  wp.lon = 8.764052 * 10000000;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
@@ -232,8 +232,8 @@ void planeSetWP () {
 
   wp.waypointNumber = 5;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 501006770;
-  wp.lon = 87613580;
+  wp.lat = 50.100306 * 10000000;
+  wp.lon = 8.760833 * 10000000;
   wp.alt = 500;
   wp.p1 = 0;
   wp.p2 = 0;
