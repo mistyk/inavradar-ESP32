@@ -60,14 +60,14 @@ struct planesData {
   planeData pd;
 };
 planeData pd;
-planeData pd2;
+planeData pdIn;
 planesData pds[5];
 
 bool loraRX = 0; // new packet flag
+bool loraRXd = 0; // new packet display flag
 bool loraTX = 0;
 planeData loraMsg;
 byte loraAddress = 0x01; // our uniq loraAddress
-
 
 // ----------------------------------------------------------------------------- String seperator split
 String getValue(String data, char separator, int index) {
@@ -98,6 +98,7 @@ void onReceive(int packetSize) {
   Serial.println(loraMsg.planeName);
   if (!loraRX && loraMsg.header == "ADS-RC") {
       loraRX = 1;
+      pdIn = loraMsg;
   }
 }
 
@@ -137,12 +138,16 @@ void drawDisplay () {
   display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
   display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
 
+  for (size_t i = 0; i <=4 ; i++) {
+    if (pds[i].waypointNumber != 0) display.drawString (0,i*8, pds[i].pd.planeName);
+  }
+/*
   display.drawString (0,0, "Camille");
   display.drawString (0,8, "Daniel");
   display.setTextAlignment (TEXT_ALIGN_RIGHT);
   display.drawString (128,0, "1,2km A");
   display.drawString (128,8, "5m A");
-
+*/
   display.display();
 }
 
@@ -178,9 +183,15 @@ void getPlaneGPS () {
 }
 
 void getPlaneData () {
+
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
     Serial.println(pd.planeName);
+
+  } else {
+    String("No FC").toCharArray(pd.planeName,20);
   }
+
+
 //  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
 //    Serial.println(pd.planeFC);
 //  }
@@ -271,19 +282,47 @@ void setup() {
   initMSP();
   initLora();
 
-
-
   delay(2000);
 
-  planeSetWP();
+  for (size_t i = 0; i <= 4; i++) {
+    pds[i].waypointNumber = 0;
+  }
+  //planeSetWP();
 
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
+  if (loraRX) {
+    loraRXd = 1;
+    bool found = 0;
+    size_t free = 0;
+    for (size_t i = 0; i <= 4; i++) {
+      if (pds[i].pd.loraAddress == pdIn.loraAddress ) {
+        pds[i].pd = pdIn;
+        pds[i].waypointNumber = i+1;
+        pds[i].lastUpdate = millis();
+        found = 1;
+      }
+      if (!free && pds[i].waypointNumber == 0) free = i;
+    }
+    if (!found) {
+        pds[free].waypointNumber = free+1;
+        pds[free].pd = pdIn;
+        pds[free].lastUpdate = millis();
+    }
+    loraRX = 0;
+  }
+
   if (millis() - displayLastTime > displayInterval) {
+    for (size_t i = 0; i <= 4; i++) {
+      if (millis() - pds[i].lastUpdate > 5000) {
+        pds[i].waypointNumber = 0;
+        pds[i].pd.loraAddress = 0;
+      }
+    }
     drawDisplay();
     loraTX = 0;
-    loraRX = 0;
+    loraRXd = 0;
     displayLastTime = millis();
   }
 
