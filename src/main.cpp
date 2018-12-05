@@ -183,15 +183,11 @@ void getPlaneGPS () {
 }
 
 void getPlaneData () {
-
+  String("No FC").toCharArray(pd.planeName,20);
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
     Serial.println(pd.planeName);
 
-  } else {
-    String("No FC").toCharArray(pd.planeName,20);
   }
-
-
 //  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
 //    Serial.println(pd.planeFC);
 //  }
@@ -200,6 +196,24 @@ void getPlaneData () {
 void planeSetWP () {
   msp_set_wp_t wp;
 
+  for (size_t i = 0; i <= 4; i++) {
+    if (pds[i].waypointNumber != 0) {
+      wp.waypointNumber = pds[i].waypointNumber;
+      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+      wp.lat = pds[i].pd.gps.lat;
+      wp.lon = pds[i].pd.gps.lon;
+      wp.alt = pds[i].pd.gps.alt;
+      wp.p1 = pds[i].pd.gps.groundSpeed;
+      wp.p2 = 0;
+      wp.p3 = 0;
+      if (i == 4 || pds[i+1].waypointNumber!=0) wp.flag = 0xa5;
+      else wp.flag = 0;
+      msp.command(MSP_SET_WP, &wp, sizeof(wp));
+    }
+    else break;
+  }
+  //msp.command(MSP_SET_WP, &wp, sizeof(wp));
+/*
   wp.waypointNumber = 1;
   wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
   wp.lat = 50.1006770 * 10000000;
@@ -251,7 +265,7 @@ void planeSetWP () {
   wp.p3 = 0;
   wp.flag = 0xa5;
   msp.command(MSP_SET_WP, &wp, sizeof(wp));
-
+*/
 }
 
 void initMSP () {
@@ -332,6 +346,9 @@ void loop() {
     loraTX = 1;
     sendMessage(&pd);
     LoRa.receive();
+
+    planeSetWP();
+
     sendLastTime = millis();
   }
 }
