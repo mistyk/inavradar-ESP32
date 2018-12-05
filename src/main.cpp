@@ -96,7 +96,7 @@ void onReceive(int packetSize) {
   if (packetSize == 0) return;
   LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
   Serial.println(loraMsg.planeName);
-  if (!loraRX && loraMsg.header == "ADS-RC") {
+  if (!loraRX && loraMsg.header == "ADS-RC") { // new plane data
       loraRX = 1;
       pdIn = loraMsg;
   }
@@ -297,15 +297,15 @@ void loop() {
     bool found = 0;
     size_t free = 0;
     for (size_t i = 0; i <= 4; i++) {
-      if (pds[i].pd.loraAddress == pdIn.loraAddress ) {
+      if (pds[i].pd.loraAddress == pdIn.loraAddress ) { // update plane
         pds[i].pd = pdIn;
         pds[i].waypointNumber = i+1;
         pds[i].lastUpdate = millis();
         found = 1;
       }
-      if (!free && pds[i].waypointNumber == 0) free = i;
+      if (!free && pds[i].waypointNumber == 0) free = i; // find free slot
     }
-    if (!found) {
+    if (!found) { // if not there put it in free slot
         pds[free].waypointNumber = free+1;
         pds[free].pd = pdIn;
         pds[free].lastUpdate = millis();
@@ -314,8 +314,9 @@ void loop() {
   }
 
   if (millis() - displayLastTime > displayInterval) {
+
     for (size_t i = 0; i <= 4; i++) {
-      if (millis() - pds[i].lastUpdate > 5000) {
+      if (millis() - pds[i].lastUpdate > 5000) { // plane timeout
         pds[i].waypointNumber = 0;
         pds[i].pd.loraAddress = 0;
       }
