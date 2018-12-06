@@ -50,7 +50,6 @@ struct planeData {
   String header;
   byte loraAddress;
   char planeName[20];
-  //char planeFC[20];
   bool armState;
   msp_raw_gps_t gps;
 };
@@ -62,6 +61,7 @@ struct planesData {
 planeData pd;
 planeData pdIn;
 planesData pds[5];
+char planeFC[20];
 
 bool loraRX = 0; // new packet flag
 bool loraRXd = 0; // new packet display flag
@@ -185,12 +185,12 @@ void getPlaneGPS () {
 void getPlaneData () {
   String("No FC").toCharArray(pd.planeName,20);
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
-    Serial.println(pd.planeName);
+    //Serial.println(pd.planeName);
 
   }
-//  if (msp.request(2, &pd.planeFC, sizeof(pd.planeFC))) {
-//    Serial.println(pd.planeFC);
-//  }
+  if (msp.request(2, &planeFC, sizeof(planeFC))) {
+    //Serial.println(planeFC);
+  }
 }
 
 void planeSetWP () {
@@ -213,59 +213,61 @@ void planeSetWP () {
     else break;
   }
   //msp.command(MSP_SET_WP, &wp, sizeof(wp));
-/*
-  wp.waypointNumber = 1;
-  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 50.1006770 * 10000000;
-  wp.lon = 8.7613380 * 10000000;
-  wp.alt = 500;
-  wp.p1 = 0;
-  wp.p2 = 0;
-  wp.p3 = 0;
-  wp.flag = 0;
-  msp.command(MSP_SET_WP, &wp, sizeof(wp));
-  wp.waypointNumber = 2;
-  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 50.1020320 * 10000000;
-  wp.lon = 8.7615830 * 10000000;
-  wp.alt = 500;
-  wp.p1 = 0;
-  wp.p2 = 0;
-  wp.p3 = 0;
-  wp.flag = 0;
-  msp.command(MSP_SET_WP, &wp, sizeof(wp));
-  wp.waypointNumber = 3;
-  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 50.102137 * 10000000;
-  wp.lon = 8.762990 * 10000000;
-  wp.alt = 500;
-  wp.p1 = 0;
-  wp.p2 = 0;
-  wp.p3 = 0;
-  wp.flag = 0;
-  msp.command(MSP_SET_WP, &wp, sizeof(wp));
-  wp.waypointNumber = 4;
-  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 50.100547 * 10000000;
-  wp.lon = 8.764052 * 10000000;
-  wp.alt = 500;
-  wp.p1 = 0;
-  wp.p2 = 0;
-  wp.p3 = 0;
-  wp.flag = 0;
-  msp.command(MSP_SET_WP, &wp, sizeof(wp));
+}
+  void planeFakeWP () {
+    msp_set_wp_t wp;
+    wp.waypointNumber = 1;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 50.1006770 * 10000000;
+    wp.lon = 8.7613380 * 10000000;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
+    wp.waypointNumber = 2;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 50.1020320 * 10000000;
+    wp.lon = 8.7615830 * 10000000;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
+    wp.waypointNumber = 3;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 50.102137 * 10000000;
+    wp.lon = 8.762990 * 10000000;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
+    wp.waypointNumber = 4;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 50.100547 * 10000000;
+    wp.lon = 8.764052 * 10000000;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
 
-  wp.waypointNumber = 5;
-  wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-  wp.lat = 50.100306 * 10000000;
-  wp.lon = 8.760833 * 10000000;
-  wp.alt = 500;
-  wp.p1 = 0;
-  wp.p2 = 0;
-  wp.p3 = 0;
-  wp.flag = 0xa5;
-  msp.command(MSP_SET_WP, &wp, sizeof(wp));
-*/
+    wp.waypointNumber = 5;
+    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+    wp.lat = 50.100306 * 10000000;
+    wp.lon = 8.760833 * 10000000;
+    wp.alt = 500;
+    wp.p1 = 0;
+    wp.p2 = 0;
+    wp.p3 = 0;
+    wp.flag = 0xa5;
+    msp.command(MSP_SET_WP, &wp, sizeof(wp));
+
 }
 
 void initMSP () {
@@ -281,28 +283,37 @@ void initMSP () {
   Serial.print("FC ");
   display.drawString (0, 16, "FC ");
   display.display();
-  delay(200);
+  delay(2000);
   getPlaneData();
   getPlanetArmed();
   getPlaneGPS();
-  Serial.println("- OK");
-  display.drawString (100, 16, "OK");
+  Serial.print("- ");
+  Serial.println(planeFC);
+  display.drawString (100, 16, planeFC);
   display.display();
 }
 // ----------------------------------------------------------------------------- main init
 void setup() {
   Serial.begin(115200);
   initDisplay();
-  initMSP();
   initLora();
-
+  initMSP();
   delay(2000);
-
+/*
   for (size_t i = 0; i <= 4; i++) {
-    pds[i].waypointNumber = 0;
-  }
+    pds[i].waypointNumber = i+1;
+    pds[i].pd.header= "ADS-RC";
+    pds[i].pd.loraAddress= i+1;
+    String("Testplane #1").toCharArray(pds[i].pd.planeName,20);
+    pds[i].pd.armState= 1;
+    pds[i].pd.gps.lat=(50.1006770 * 10000000) + (i*10000);
+    pds[i].pd.gps.lon=8.7613380 * 10000000;
+    pds[i].pd.gps.alt=500;
+    pds[i].pd.gps.groundSpeed=0;
+    sendMessage(&pds[i].pd);
+    delay(1000);
+  }*/
   //planeSetWP();
-
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
@@ -330,7 +341,7 @@ void loop() {
   if (millis() - displayLastTime > displayInterval) {
 
     for (size_t i = 0; i <= 4; i++) {
-      if (millis() - pds[i].lastUpdate > 5000) { // plane timeout
+      if (millis() - pds[i].lastUpdate > 500000) { // plane timeout
         pds[i].waypointNumber = 0;
         pds[i].pd.loraAddress = 0;
       }
@@ -347,8 +358,8 @@ void loop() {
     sendMessage(&pd);
     LoRa.receive();
 
-    planeSetWP();
-
+    //planeSetWP();
+    planeFakeWP();
     sendLastTime = millis();
   }
 }
