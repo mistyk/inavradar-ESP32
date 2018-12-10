@@ -47,7 +47,7 @@ int displayInterval = 100;
 long displayLastTime = 0;
 
 struct planeData {
-  String header;
+  char header[7];
   byte loraAddress;
   char planeName[20];
   bool armState;
@@ -61,6 +61,7 @@ struct planesData {
 planeData pd;
 planeData pdIn;
 planesData pds[5];
+planeData fakepd;
 char planeFC[20];
 
 bool loraRX = 0; // new packet flag
@@ -88,25 +89,40 @@ String getValue(String data, char separator, int index) {
 // ----------------------------------------------------------------------------- LoRa
 void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
-  LoRa.write((uint8_t*)outgoing, sizeof(pd));
+  LoRa.write((uint8_t*)outgoing, sizeof(fakepd));
   LoRa.endPacket(false);
 }
 
 void onReceive(int packetSize) {
   if (packetSize == 0) return;
   LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
-  Serial.println(loraMsg.planeName);
-  if (!loraRX && loraMsg.header == "ADS-RC") { // new plane data
+  Serial.println(loraMsg.header);
+  if (!loraRX && String(loraMsg.header) == "ADS-RC") { // new plane data
       loraRX = 1;
       pdIn = loraMsg;
+      Serial.println("new packet");
   }
 }
-
+void sendFakePlanes () {
+  for (size_t i = 0; i <= 4; i++) {
+    String("ADS-RC").toCharArray(fakepd.header,7);
+    fakepd.loraAddress = (char)i+1;
+    String("Testplane #").toCharArray(fakepd.planeName,20);
+    fakepd.armState=  1;
+    fakepd.gps.lat = 50.1006770 * 10000000;
+    fakepd.gps.lon = 8.7613380 * 10000000;
+    fakepd.gps.alt = 100;
+    fakepd.gps.groundSpeed = 50;
+    sendMessage(&fakepd);
+    delay(1000);
+  }
+}
 void initLora() {
 	display.drawString (0, 24, "LORA");
   display.display();
   pd.loraAddress = loraAddress;
-  pd.header = "ADS-RC";
+  String("ADS-RC").toCharArray(pd.header,7);
+  //pd.header = "ADS-RC";
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
   if (!LoRa.begin(BAND)) {
@@ -136,7 +152,7 @@ void drawDisplay () {
   display.drawString (106,54, "RX");
 
   display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
-  display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
+  display.drawXbm(120, 55, 8, 8, loraRXd ? activeSymbol : inactiveSymbol);
 
   for (size_t i = 0; i <=4 ; i++) {
     if (pds[i].waypointNumber != 0) display.drawString (0,i*8, pds[i].pd.planeName);
@@ -220,8 +236,8 @@ void planeSetWP () {
     wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
     wp.lat = 50.1006770 * 10000000;
     wp.lon = 8.7613380 * 10000000;
-    wp.alt = 500;
-    wp.p1 = 0;
+    wp.alt = 100;
+    wp.p1 = 200;
     wp.p2 = 0;
     wp.p3 = 0;
     wp.flag = 0;
@@ -230,8 +246,8 @@ void planeSetWP () {
     wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
     wp.lat = 50.1020320 * 10000000;
     wp.lon = 8.7615830 * 10000000;
-    wp.alt = 500;
-    wp.p1 = 0;
+    wp.alt = 200;
+    wp.p1 = 100;
     wp.p2 = 0;
     wp.p3 = 0;
     wp.flag = 0;
@@ -240,7 +256,7 @@ void planeSetWP () {
     wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
     wp.lat = 50.102137 * 10000000;
     wp.lon = 8.762990 * 10000000;
-    wp.alt = 500;
+    wp.alt = 300;
     wp.p1 = 0;
     wp.p2 = 0;
     wp.p3 = 0;
@@ -250,8 +266,8 @@ void planeSetWP () {
     wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
     wp.lat = 50.100547 * 10000000;
     wp.lon = 8.764052 * 10000000;
-    wp.alt = 500;
-    wp.p1 = 0;
+    wp.alt = 400;
+    wp.p1 = 500;
     wp.p2 = 0;
     wp.p3 = 0;
     wp.flag = 0;
@@ -262,7 +278,7 @@ void planeSetWP () {
     wp.lat = 50.100306 * 10000000;
     wp.lon = 8.760833 * 10000000;
     wp.alt = 500;
-    wp.p1 = 0;
+    wp.p1 = 1000;
     wp.p2 = 0;
     wp.p3 = 0;
     wp.flag = 0xa5;
@@ -299,26 +315,17 @@ void setup() {
   initLora();
   initMSP();
   delay(2000);
-/*
+
   for (size_t i = 0; i <= 4; i++) {
-    pds[i].waypointNumber = i+1;
-    pds[i].pd.header= "ADS-RC";
-    pds[i].pd.loraAddress= i+1;
-    String("Testplane #1").toCharArray(pds[i].pd.planeName,20);
-    pds[i].pd.armState= 1;
-    pds[i].pd.gps.lat=(50.1006770 * 10000000) + (i*10000);
-    pds[i].pd.gps.lon=8.7613380 * 10000000;
-    pds[i].pd.gps.alt=500;
-    pds[i].pd.gps.groundSpeed=0;
-    sendMessage(&pds[i].pd);
-    delay(1000);
-  }*/
-  //planeSetWP();
+    pds[i].pd.loraAddress= 0x00;
+  }
+
+  //sendFakePlanes();
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
   if (loraRX) {
-    loraRXd = 1;
+
     bool found = 0;
     size_t free = 0;
     for (size_t i = 0; i <= 4; i++) {
@@ -327,6 +334,7 @@ void loop() {
         pds[i].waypointNumber = i+1;
         pds[i].lastUpdate = millis();
         found = 1;
+        Serial.println("update");
       }
       if (!free && pds[i].waypointNumber == 0) free = i; // find free slot
     }
@@ -334,7 +342,9 @@ void loop() {
         pds[free].waypointNumber = free+1;
         pds[free].pd = pdIn;
         pds[free].lastUpdate = millis();
+        Serial.println("new");
     }
+    loraRXd = 1;
     loraRX = 0;
   }
 
