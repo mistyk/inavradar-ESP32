@@ -6,8 +6,11 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 ## Hardware
 Current development is done using these cheap ESP32 LoRa modules.
 There are different variants for 433MHz and 868/915MHz:
+
 [Banggood: ESP32 Lora 868/915MHz (2 Pcs)](https://www.banggood.com/de/2Pcs-Wemos-TTGO-LORA32-868915Mhz-ESP32-LoRa-OLED-0_96-Inch-Blue-Display-p-1239769.html?rmmds=search&cur_warehouse=CN)
+
 [Banggood: ESP32 Lora 433MHz](https://www.banggood.com/de/Wemos-TTGO-LORA-SX1278-ESP32-0_96OLED-16-Mt-Bytes-128-Mt-bit-433Mhz-For-Arduino-p-1205930.html?rmmds=search&cur_warehouse=CN)
+
 Other variants without OLED display and different antenna connectors should also work.
 Also please keep track of your countries regulations regarding radio transmissions.
 
