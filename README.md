@@ -27,5 +27,24 @@ It's a fork from the INAV repo and instructions how to build can be found [here]
 
 INAV-Radar is currently no part of the INAV flight control software. INAV can be found [here](https://github.com/iNavFlight/inav).
 
+## Testing
+For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
+
+Your system needs the [driver for the USB UART bridge](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers).
+
+Also you will need either [Python 2.7 or Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
+
+The latest stable esptool.py release can be installed via pip:
+```
+$ pip install esptool
+```
+
+Download the air-to-air test firmware from the [testing folder](https://github.com/espressif/esptool/testing/)
+and extract it. Run this command to flash it onto your ESP32 LoRa module:
+```
+$ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
+```
+You may change the port to match your operating system.
+
 ## Contact
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)

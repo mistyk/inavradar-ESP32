@@ -320,7 +320,7 @@ void setup() {
     pds[i].pd.loraAddress= 0x00;
   }
 
-  //sendFakePlanes();
+sendFakePlanes();
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
