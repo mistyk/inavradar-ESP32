@@ -14,6 +14,12 @@ There are different variants for 433MHz and 868/915MHz:
 
 Other variants without OLED display and different antenna connectors should also work.
 
+For those who want a smaller form factor and the [world record](https://www.youtube.com/watch?v=adhWIo-7gr4) RFM95 radio:
+
+[EXP-Tech: ATmega168 Grove Lora 868 MHz](https://www.exp-tech.de/module/wireless/funk/8022/seeed-studio-grove-lora-radio-868-mhz-rfm95)
+
+[EXP-Tech: ATmega168 Grove Lora 433 MHz](https://www.exp-tech.de/module/wireless/funk/8024/seeed-studio-grove-lora-radio-433-mhz-rfm95)
+
 Also please keep track of your countries regulations regarding radio transmissions.
 
 ## Software
