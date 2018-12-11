@@ -661,6 +661,8 @@ class MSP {
 
     // low level functions
 
+    uint8_t crc8_dvb_s2(uint8_t crc, byte a);
+
     void send(uint8_t messageID, void * payload, uint8_t size);
 
     void sendV2(uint16_t messageID, void * payload, uint16_t size);
@@ -672,6 +674,8 @@ class MSP {
     bool request(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
 
     bool command(uint8_t messageID, void * payload, uint8_t size, bool waitACK = true);
+
+    bool commandv2(uint16_t messageID, void * payload, uint16_t size, bool waitACK = true);
 
     void reset();
 
