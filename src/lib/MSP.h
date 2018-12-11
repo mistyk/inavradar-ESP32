@@ -636,7 +636,18 @@ struct msp_set_wp_t {
   uint8_t flag;     // 0xa5 = last, otherwise set to 0
 } __attribute__ ((packed));
 
-
+struct msp_raw_planes_t {
+  uint8_t id;
+  bool arm_state;
+  int32_t lat;
+  int32_t lon;
+  int32_t alt;
+  uint16_t heading;
+  uint16_t speed;
+  char callsign0;
+  char callsign1;
+  char callsign2;
+} __attribute__((packed));
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -651,6 +662,9 @@ class MSP {
     // low level functions
 
     void send(uint8_t messageID, void * payload, uint8_t size);
+
+    void sendV2(uint16_t messageID, void * payload, uint16_t size);
+
     bool recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);    
 
     bool waitFor(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);

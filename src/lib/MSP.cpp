@@ -54,7 +54,42 @@ void MSP::send(uint8_t messageID, void * payload, uint8_t size)
   _stream->write(checksum);
 }
 
+void MSP::sendV2(uint16_t messageID, void * payload, uint16_t size) {
+  uint8_t _crc = 0;
+  uint8_t message[size + 9];
+  message[0] = '$';
+  message[1] = 'X';
+  message[2] = '<';
+  message[3] = 0; //flag
+  message[4] = messageID; //function
+  message[5] = messageID >> 8;
+  message[6] = size; //payload size
+  message[7] = size >> 8;
+  for(uint8_t i = 0; i < 8; i++) {
+    _crc = crc8_dvb_s2(_crc, message[i]);
+  }
+  //Start of Payload
+  uint8_t * payloadPtr = (uint8_t*)payload;
+  for (uint8_t i = 0; i < size; ++i) {
+    message[i+8] = *(payloadPtr++);
+    _crc = crc8_dvb_s2(_crc, i+8);
+  }
+  message[size+8] = _crc;
+  _stream->write(message,sizeof(message));
+}
 
+uint8_t crc8_dvb_s2(uint8_t crc, byte a)
+{
+    crc ^= a;
+    for (int ii = 0; ii < 8; ++ii) {
+        if (crc & 0x80) {
+            crc = (crc << 1) ^ 0xD5;
+        } else {
+            crc = crc << 1;
+        }
+    }
+    return crc;
+}
 // timeout in milliseconds
 bool MSP::recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize)
 {
