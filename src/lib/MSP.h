@@ -24,7 +24,7 @@
 #include <Arduino.h>
 #include <Stream.h>
 
-// requests & replies 
+// requests & replies
 #define MSP_API_VERSION            1
 #define MSP_FC_VARIANT             2
 #define MSP_FC_VERSION             3
@@ -71,7 +71,7 @@
 #define MSP_SET_WP               209 // sets a given WP (WP#, lat, lon, alt, flags)
 
 
-// bits of getActiveModes() return value 
+// bits of getActiveModes() return value
 #define MSP_MODE_ARM          0
 #define MSP_MODE_ANGLE        1
 #define MSP_MODE_HORIZON      2
@@ -145,7 +145,7 @@ struct msp_build_info_t {
 struct msp_raw_imu_t {
   int16_t acc[3];  // x, y, z
   int16_t gyro[3]; // x, y, z
-  int16_t mag[3];  // x, y, z  
+  int16_t mag[3];  // x, y, z
 } __attribute__ ((packed));
 
 
@@ -190,7 +190,7 @@ struct msp_sensor_status_t {
   uint8_t hwGPSStatus;
   uint8_t hwRangefinderStatus;
   uint8_t hwPitotmeterStatus;
-  uint8_t hwOpticalFlowStatus;  
+  uint8_t hwOpticalFlowStatus;
 } __attribute__ ((packed));
 
 
@@ -260,7 +260,7 @@ struct msp_attitude_t {
 struct msp_altitude_t {
   int32_t estimatedActualPosition;  // cm
   int16_t estimatedActualVelocity;  // cm/s
-  int32_t baroLatestAltitude;      
+  int32_t baroLatestAltitude;
 } __attribute__ ((packed));
 
 
@@ -275,7 +275,7 @@ struct msp_analog_t {
   uint8_t  vbat;     // 0...255
   uint16_t mAhDrawn; // milliamp hours drawn from battery
   uint16_t rssi;     // 0..1023
-  int16_t  amperage; // send amperage in 0.01 A steps, range is -320A to 320A  
+  int16_t  amperage; // send amperage in 0.01 A steps, range is -320A to 320A
 } __attribute__ ((packed));
 
 
@@ -301,7 +301,7 @@ struct msp_rc_tuning_t {
   uint8_t  thrMid8;
   uint8_t  thrExpo8;
   uint16_t tpa_breakpoint;
-  uint8_t  rcYawExpo8;  
+  uint8_t  rcYawExpo8;
 } __attribute__ ((packed));
 
 
@@ -502,14 +502,14 @@ struct msp_board_alignment_t {
 #define MSP_CURRENT_SENSOR_ADC     1
 #define MSP_CURRENT_SENSOR_VIRTUAL 2
 #define MSP_CURRENT_SENSOR_MAX     CURRENT_SENSOR_VIRTUAL
- 
+
 
 // MSP_CURRENT_METER_CONFIG reply
 struct msp_current_meter_config_t {
   int16_t currentMeterScale;
   int16_t currentMeterOffset;
   uint8_t currentMeterType; // MSP_CURRENT_SENSOR_XXX
-  uint16_t batteryCapacity;  
+  uint16_t batteryCapacity;
 } __attribute__ ((packed));
 
 
@@ -547,11 +547,11 @@ struct msp_rx_config_t {
   uint16_t  rx_min_usec;
   uint16_t  rx_max_usec;
   uint8_t   dummy1;
-  uint8_t   dummy2; 
+  uint8_t   dummy2;
   uint16_t  dummy3;
   uint8_t   rx_spi_protocol;  // one of MSP_SPI_PROT_XXX values
   uint32_t  rx_spi_id;
-  uint8_t   rx_spi_rf_channel_count; 
+  uint8_t   rx_spi_rf_channel_count;
 } __attribute__ ((packed));
 
 
@@ -625,7 +625,7 @@ struct msp_set_raw_gps_t {
 // MSP_SET_WP command
 // Special waypoints are 0 and 255. 0 is the RTH position, 255 is the POSHOLD position (lat, lon, alt).
 struct msp_set_wp_t {
-  uint8_t waypointNumber;  
+  uint8_t waypointNumber;
   uint8_t action;   // one of MSP_NAV_STATUS_WAYPOINT_ACTION_XXX
   int32_t lat;      // decimal degrees latitude * 10000000
   int32_t lon;      // decimal degrees longitude * 10000000
@@ -636,14 +636,25 @@ struct msp_set_wp_t {
   uint8_t flag;     // 0xa5 = last, otherwise set to 0
 } __attribute__ ((packed));
 
-
+struct msp_raw_planes_t {
+  uint8_t id;
+  bool arm_state;
+  int32_t lat;
+  int32_t lon;
+  int32_t alt;
+  uint16_t heading;
+  uint16_t speed;
+  char callsign0;
+  char callsign1;
+  char callsign2;
+} __attribute__((packed));
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
 class MSP {
-  
+
   public:
 
     void begin(Stream & stream, uint32_t timeout = 500);
@@ -651,10 +662,13 @@ class MSP {
     // low level functions
 
     void send(uint8_t messageID, void * payload, uint8_t size);
-    bool recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);    
+
+    void sendV2(uint16_t messageID, void * payload, uint16_t size);
+
+    bool recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);
 
     bool waitFor(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
-    
+
     bool request(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
 
     bool command(uint8_t messageID, void * payload, uint8_t size, bool waitACK = true);
@@ -662,14 +676,13 @@ class MSP {
     void reset();
 
     // high level functions
-    
+
     bool getActiveModes(uint32_t * activeModes);
-    
+
 
   private:
-  
+
     Stream * _stream;
     uint32_t _timeout;
-    
-};
 
+};
