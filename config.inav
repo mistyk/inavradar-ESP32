@@ -1,3 +1,4 @@
+# mixer
 mmix 0  1.000 -1.000  1.000 -1.000
 mmix 1  1.000 -1.000 -1.000  1.000
 mmix 2  1.000  1.000  1.000  1.000
@@ -45,7 +46,7 @@ osd_layout 0 9 1 2 H
 osd_layout 0 11 1 3 H
 osd_layout 0 12 1 4 H
 osd_layout 0 14 25 10 V
-osd_layout 0 15 1 0 H
+osd_layout 0 15 25 9 V
 osd_layout 0 20 15 0 V
 osd_layout 0 21 4 0 V
 osd_layout 0 28 23 11 H
@@ -61,7 +62,10 @@ set accgain_x = 4085
 set accgain_y = 4085
 set accgain_z = 4104
 set mag_hardware = NONE
-set baro_hardware = NONE
+set magzero_x = 93
+set magzero_y = -88
+set magzero_z = -19
+set baro_hardware = BMP280
 set pitot_hardware = NONE
 set serialrx_provider = IBUS
 set min_throttle = 1065
@@ -77,5 +81,4 @@ profile 1
 
 # battery_profile
 battery_profile 1
-
 save

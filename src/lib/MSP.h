@@ -69,7 +69,8 @@
 #define MSP_SET_RAW_RC           200 // 8 rc chan
 #define MSP_SET_RAW_GPS          201 // fix, numsat, lat, lon, alt, speed
 #define MSP_SET_WP               209 // sets a given WP (WP#, lat, lon, alt, flags)
-
+// v2 commands
+#define MSP2_ESP32 							 0x2040
 
 // bits of getActiveModes() return value
 #define MSP_MODE_ARM          0
@@ -665,7 +666,7 @@ class MSP {
 
     void send(uint8_t messageID, void * payload, uint8_t size);
 
-    void sendV2(uint16_t messageID, void * payload, uint16_t size);
+    void sendv2(uint16_t messageID, void * payload, uint16_t size);
 
     bool recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);
 
