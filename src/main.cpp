@@ -138,6 +138,7 @@ void cliHelp(void) {
 void cliConfig(void) {
   Serial.println();
   Serial.println("=============== Configuration ==============");
+
 }
 void cliDebug(void) {
   Serial.println();
@@ -148,8 +149,9 @@ void cliDebug(void) {
 void cliReboot(void) {
   Serial.println();
   Serial.println("Rebooting ...");
+  Serial.println();
+  delay(1000);
   ESP.restart();
-
 }
 void cliGPS(void) {
   Serial.println();
