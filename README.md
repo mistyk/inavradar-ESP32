@@ -36,7 +36,9 @@ INAV-Radar is currently no part of the INAV flight control software. INAV can be
 ## Testing communication between ESP32 Lora modules
 For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
 
-Your system needs the [driver for the USB UART bridge](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers).
+Your system needs the driver for the USB UART bridge:
+[Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
+[Heltec MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
 
 Also you will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
 
