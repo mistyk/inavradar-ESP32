@@ -41,8 +41,15 @@ Your system needs the [driver for the USB UART bridge](https://www.silabs.com/pr
 Also you will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
 
 The latest stable esptool.py release can be installed via pip in your command prompt:
+
+Windows:
 ```
 $ pip install esptool
+```
+
+MacOS:
+```
+$ pip3 install esptool
 ```
 
 Download the air-to-air test firmware from the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing)
