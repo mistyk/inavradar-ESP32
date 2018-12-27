@@ -38,7 +38,7 @@ For testing there is no need to install Atom and PlatformIO, just use the [espto
 
 Your system needs the driver for the USB UART bridge:
 [Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
-[Heltec MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
+ or [Heltec MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
 
 Also you will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
 
