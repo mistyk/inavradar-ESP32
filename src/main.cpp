@@ -4,14 +4,16 @@
 #include <lib/MSP.h>
 #include <lib/LoRa.h>
 #include <Arduino.h>
+#include "BluetoothSerial.h"
 #include <EEPROM.h>
 #include <main.h>
 
 #ifdef RADARESP32
 #include <SSD1306.h>
 #include <esp_system.h>
-#include <lib/CLI.h>
-
+//#include <lib/CLI.h>
+#include <SimpleCLI.h>
+using namespace simplecli;
 #define rxPin 17
 #define txPin 23
 #endif
@@ -29,10 +31,11 @@
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 #define BAND 868E6 // 915E6
 
-#define CFGVER 1
+#define CFGVER 2
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 SSD1306 display (0x3c, 4, 15);
+BluetoothSerial SerialBT;
 MSP msp;
 bool booted = 0;
 
@@ -84,7 +87,7 @@ void initConfig () {
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
     cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane)
-    cfg.debugOutput = false;
+    cfg.debugOutput = true;
     cfg.debugFakeWPs = false;
     cfg.debugFakePlanes = false;
     cfg.debugFakeMoving = false;
@@ -100,7 +103,75 @@ void initConfig () {
   }
 }
 // ----------------------------------------------------------------------------- CLI
-Cli cli = Cli(Serial);
+SimpleCLI* cli;
+
+int  serIn;             // var that will hold the bytes-in read from the serialBuffer
+char serInString[100];  // array that will hold the different bytes  100=100characters;
+                        // -> you must state how long the array will be else it won't work.
+int  serInIndx  = 0;    // index of serInString[] in which to insert the next incoming byte
+int  serOutIndx = 0;    // index of the outgoing serInString[] array;
+
+void readCli () {
+
+  int sb;
+  if(Serial.available()) {
+  //Serial.print("reading Serial String: ");     //optional confirmation
+    while (Serial.available()){
+      sb = Serial.read();
+      serInString[serInIndx] = sb;
+      serInIndx++;
+      Serial.write(sb);
+      if (sb == '\n') {
+        cli->parse(serInString);
+        serInIndx = 0;
+        memset(serInString, 0, sizeof(serInString));
+        Serial.print("> ");
+      }
+    }
+  }
+}
+
+void initCli () {
+  // =========== Create CommandParser =========== //
+  cli = new SimpleCLI();
+
+   // when no valid command could be found for given user input
+   cli->onNotFound = [](String str) {
+                         Serial.println("\"" + str + "\" not found");
+                     };
+   // ============================================ //
+
+
+   // =========== Add hello command ========== //
+   // hello => hello world!
+   cli->addCmd(new Command("hello", [](Cmd* cmd) {
+       Serial.println("hello world");
+   }));
+   // ======================================== //
+
+
+   // =========== Add ping command =========== //
+   // ping                 => pong
+   // ping -s ponk         => ponk
+   // ping -s ponk -n 2    => ponkponk
+   Command* ping = new Command("ping", [](Cmd* cmd) {
+
+     Serial.println(cmd->getValue(0));
+     Serial.println(cmd->getValue(1));
+   });
+   ping->addArg(new AnonymOptArg("ping!"));
+   ping->addArg(new AnonymOptArg("1"));
+   cli->addCmd(ping);
+   // ======================================== //
+
+
+   // run tests
+   cli->parse("ping");
+   cli->parse("hello");
+}
+
+
+//Cli cli = Cli(Serial);
 void cliLog (String log) {
   if (cfg.debugOutput) {
     if (booted) {
@@ -174,7 +245,8 @@ void onReceive(int packetSize) {
   if (packetSize == 0) return;
   LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
   cliLog(loraMsg.header);
-  if (loraMsg.header == cfg.loraHeader) { // new plane data
+  cliLog(cfg.loraHeader);
+  if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
       loraRX = 1;
       pdIn = loraMsg;
       cliLog("New air packet");
@@ -466,12 +538,16 @@ void initMSP () {
 // ----------------------------------------------------------------------------- main init
 void setup() {
 
-  cli.RegisterCmd("status",&cliStatus);
+/*  cli.RegisterCmd("status",&cliStatus);
   cli.RegisterCmd("help",&cliHelp);
   cli.RegisterCmd("config",&cliConfig);
   cli.RegisterCmd("debug",&cliDebug);
-  cli.RegisterCmd("reboot",&cliReboot);
+  cli.RegisterCmd("reboot",&cliReboot); */
+
   Serial.begin(115200);
+  //SerialBT.begin("ESP32");
+  initCli();
+
   initConfig();
   initDisplay();
 
@@ -491,6 +567,7 @@ void loop() {
   if (millis() - displayLastTime > cfg.intervalDisplay) {
     #ifdef RADARESP32
     drawDisplay();
+    readCli();
     #endif
     for (size_t i = 0; i <= 4; i++) {
       if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
@@ -515,7 +592,8 @@ void loop() {
   }
 
   if (millis() - sendLastTime > cfg.intervalSend + random(0, 20)) {
-    cli.Run();
+
+
     if (pd.armState) {
       getPlaneGPS();
       loraTX = 1;
