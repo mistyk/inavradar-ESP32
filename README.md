@@ -57,5 +57,10 @@ You may change the --port to match your operating system. If you are using Windo
 The output should look something like this:
 ![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
 
+After the firmware is flashed on the devices you should see 'No FC' or the name of the UAV on the opposing display.
+If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
+
+Thanks for testing! 😄 👍
+
 ## Contact
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
