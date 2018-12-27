@@ -12,7 +12,7 @@ There are different variants for 433MHz and 868/915MHz:
 
 [Banggood: ESP32 Lora 433MHz](https://www.banggood.com/de/Wemos-TTGO-LORA-SX1278-ESP32-0_96OLED-16-Mt-Bytes-128-Mt-bit-433Mhz-For-Arduino-p-1205930.html?rmmds=search&cur_warehouse=CN)
 
-Other variants without OLED display and different antenna connectors should also work.
+Other variants (e.g. Heltec) or without OLED display and different antenna connectors should also work.
 
 For those who want a smaller form factor and the [world record](https://www.youtube.com/watch?v=adhWIo-7gr4) RFM95 radio:
 
