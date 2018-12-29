@@ -38,7 +38,7 @@ For testing there is no need to install Atom and PlatformIO, just use the [espto
 
 Your system needs the driver for the USB UART bridge:
 [Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
- or [Heltec MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
+ or [Alternative MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
 
 Also you will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
 
@@ -55,8 +55,9 @@ $ pip3 install esptool
 ```
 
 Download the air-to-air test firmware from the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing)
-and extract it. Run this command to flash it onto your ESP32 Lora module:
+and extract it. Run this command to flash it onto your ESP32 Lora module (Windows and MacOS):
 ```
+$ cd (your air-to-air directory here)
 $ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
 ```
 You may change the --port to match your operating system. If you are using Windows check the [device manager](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/devManager.PNG).
@@ -66,6 +67,13 @@ The output should look something like this:
 
 After the firmware is flashed on the devices you should see 'No FC' (or the name of the UAV) on the opposing display.
 If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
+
+There is also a Android app in the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) to control debugging modes like sending fake planes to FC or via radio. If your ESP is powered up you can pair it to your phone via Bluetooth. Also note that Bluetooth is disabled in arming.
+
+A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
+To connect the ESP32 to the FC wire up +5V and GND,
+TX from FC to ESP RX pin 17 and
+RX from FC to ESP TX ping 23.
 
 Thanks for testing! 😄 👍
 
