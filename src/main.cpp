@@ -29,7 +29,7 @@ using namespace simplecli;
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
-#define BAND 868E6 // 915E6
+#define BAND 433E6 // 915E6
 
 #define CFGVER 2
 // ----------------------------------------------------------------------------- global vars
@@ -46,6 +46,7 @@ long sendLastTime = 0;
 long displayLastTime = 0;
 long pdLastTime = 0;
 
+msp_raw_gps_t homepos; // set on arm
 planeData pd; // our uav data
 planeData pdIn; // new air packet
 planesData pds[5]; // uav db
@@ -79,7 +80,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     cfg.loraAddress = 1; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // 6?
     cfg.loraSpreadingFactor = 7; // 7?
@@ -291,17 +292,23 @@ void onReceive(int packetSize) {
 }
 int moving = 0;
 void sendFakePlanes () {
+  if (cfg.debugFakeMoving && moving > 10) {
+    moving = 0;
+  } else {
+    moving = 0;
+  }
   cliLog("Sending fake UAVs via radio ...");
   String("ADS-RC").toCharArray(fakepd.header,7);
   fakepd.loraAddress = (char)1;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
-  fakepd.gps.lat = 50.1006770 * 10000000 + (1000 * moving);
-  fakepd.gps.lon = 8.7613380 * 10000000;
+  fakepd.gps.lat = homepos.lat + (10 * moving);
+  fakepd.gps.lon = homepos.lon;
   fakepd.gps.alt = 100;
   fakepd.gps.groundSpeed = 50;
   sendMessage(&fakepd);
   delay(300);
+  /*
   fakepd.loraAddress = (char)2;
   String("Testplane #2").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
@@ -330,6 +337,7 @@ void sendFakePlanes () {
   fakepd.gps.lon = 8.762406 * 10000000;
   sendMessage(&fakepd);
   delay(300);
+*/
   cliLog("Fake UAVs sent.");
   moving++;
 }
@@ -472,6 +480,11 @@ void planeFakeWPv2 () {
 
 void planeFakeWP () {
     msp_set_wp_t wp;
+    if (cfg.debugFakeMoving && moving > 10) {
+      moving = 0;
+    } else {
+      moving = 0;
+    }
 /*    wp.waypointNumber = 1;
     wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
     wp.lat = 50.1006770 * 10000000;
@@ -513,17 +526,22 @@ void planeFakeWP () {
     wp.flag = 0;
     msp.command(MSP_SET_WP, &wp, sizeof(wp));
 */
-    wp.waypointNumber = 1;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 50.100306 * 10000000;
-    wp.lon = 8.760833 * 10000000;
-    wp.alt = 0;
-    wp.p1 = 1000;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0xa5;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-    cliLog("Fake POIs sent to FC.");
+
+    if (pd.gps.fixType > 0) {
+      wp.waypointNumber = 1;
+      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+      wp.lat = homepos.lat-100 + (moving * 10);
+      wp.lon = homepos.lon;
+      wp.alt = homepos.alt + 300;
+      wp.p1 = 1000;
+      wp.p2 = 0;
+      wp.p3 = 0;
+      wp.flag = 0xa5;
+      msp.command(MSP_SET_WP, &wp, sizeof(wp));
+      cliLog("Fake POIs sent to FC.");
+    } else {
+      cliLog("Fake POIs waiting for GPS fix.");
+    }
 }
 
 void initMSP () {
@@ -545,7 +563,7 @@ void initMSP () {
   cliLog("Waiting for FC to start ...");
   delay(2000);
   getPlaneData();
-  getPlanetArmed();
+  //getPlanetArmed();
   getPlaneGPS();
   cliLog("FC detected: " + String(planeFC));
   #ifdef RADARESP32
@@ -606,11 +624,12 @@ void loop() {
   }
   if (millis() - pdLastTime > cfg.intervalStatus) {
     getPlaneData();
-    getPlanetArmed();
+    if (String(pd.planeName) != "No FC" ) getPlanetArmed();
     if (!pd.armState) {
       loraTX = 1;
       sendMessage(&pd);
       LoRa.receive();
+      homepos = pd.gps;
     }
     if (pd.armState && bton) {
       bton = 0;
