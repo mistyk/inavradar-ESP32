@@ -70,14 +70,13 @@ If only the bottom line with TX and RX is showing, something is not working corr
 
 There is also a Android app in the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) to control debugging modes like sending fake planes to FC or via radio. If your ESP is powered up you can pair it to your phone via Bluetooth. Also note that Bluetooth is disabled on arming.
 
+Via USB or Bluetooth serial you get a small CLI with debug output.
+
 A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:
-
-wire up +5V and GND
-
-TX from FC to ESP RX pin 17
-
-RX from FC to ESP TX ping 23
+- wire up +5V and GND
+- TX from FC to ESP RX pin 17
+- RX from FC to ESP TX ping 23
 
 Thanks for testing! 😄 👍
 
