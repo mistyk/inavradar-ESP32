@@ -38,6 +38,9 @@ SSD1306 display (0x3c, 4, 15);
 BluetoothSerial SerialBT;
 MSP msp;
 bool booted = 0;
+bool bton = 1;
+Stream *serialConsole[2];
+int cNum = 0;
 
 long sendLastTime = 0;
 long displayLastTime = 0;
@@ -112,125 +115,140 @@ int  serInIndx  = 0;    // index of serInString[] in which to insert the next in
 int  serOutIndx = 0;    // index of the outgoing serInString[] array;
 
 void readCli () {
-
-  int sb;
-  if(Serial.available()) {
-  //Serial.print("reading Serial String: ");     //optional confirmation
-    while (Serial.available()){
-      sb = Serial.read();
-      serInString[serInIndx] = sb;
-      serInIndx++;
-      Serial.write(sb);
-      if (sb == '\n') {
-        cli->parse(serInString);
-        serInIndx = 0;
-        memset(serInString, 0, sizeof(serInString));
-        Serial.print("> ");
+  for (size_t i = 0; i <= 1; i++) {
+    int sb;
+    if(serialConsole[i]->available()) {
+    //Serial.print("reading Serial String: ");     //optional confirmation
+      while (serialConsole[i]->available()){
+        sb = serialConsole[i]->read();
+        serInString[serInIndx] = sb;
+        serInIndx++;
+        serialConsole[i]->write(sb);
+        if (sb == '\n') {
+          cNum = i;
+          cli->parse(serInString);
+          serInIndx = 0;
+          memset(serInString, 0, sizeof(serInString));
+          serialConsole[i]->print("> ");
+        }
       }
     }
   }
 }
 
-void initCli () {
-  // =========== Create CommandParser =========== //
-  cli = new SimpleCLI();
-
-   // when no valid command could be found for given user input
-   cli->onNotFound = [](String str) {
-                         Serial.println("\"" + str + "\" not found");
-                     };
-   // ============================================ //
-
-
-   // =========== Add hello command ========== //
-   // hello => hello world!
-   cli->addCmd(new Command("hello", [](Cmd* cmd) {
-       Serial.println("hello world");
-   }));
-   // ======================================== //
-
-
-   // =========== Add ping command =========== //
-   // ping                 => pong
-   // ping -s ponk         => ponk
-   // ping -s ponk -n 2    => ponkponk
-   Command* ping = new Command("ping", [](Cmd* cmd) {
-
-     Serial.println(cmd->getValue(0));
-     Serial.println(cmd->getValue(1));
-   });
-   ping->addArg(new AnonymOptArg("ping!"));
-   ping->addArg(new AnonymOptArg("1"));
-   cli->addCmd(ping);
-   // ======================================== //
-
-
-   // run tests
-   cli->parse("ping");
-   cli->parse("hello");
-}
-
-
 //Cli cli = Cli(Serial);
 void cliLog (String log) {
   if (cfg.debugOutput) {
     if (booted) {
+      Serial.println();
       Serial.print("LOG: ");
-      Serial.println(log);
+      Serial.print(log);
     } else {
       Serial.println(log);
     }
   }
 }
-void cliStatus(void) {
-  Serial.println();
-  Serial.println("================== Status ==================");
-  Serial.print("FC:               ");
-  Serial.println(planeFC);
-  Serial.print("Name:             ");
-  Serial.println(pd.planeName);
-  Serial.print("Arm state:        ");
-  Serial.println(pd.armState ? "ARMED" : "DISARMED");
-  Serial.print("GPS:              ");
-  Serial.println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
+void cliStatus(int n) {
+  //serialConsole[n]->println();
+  serialConsole[n]->println("================== Status ==================");
+  serialConsole[n]->print("FC:               ");
+  serialConsole[n]->println(planeFC);
+  serialConsole[n]->print("Name:             ");
+  serialConsole[n]->println(pd.planeName);
+  serialConsole[n]->print("Arm state:        ");
+  serialConsole[n]->println(pd.armState ? "ARMED" : "DISARMED");
+  serialConsole[n]->print("GPS:              ");
+  serialConsole[n]->println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
+  serialConsole[n]->print("Local fake planes:        ");
+  serialConsole[n]->println(cfg.debugFakeWPs ? "ON" : "OFF");
+  serialConsole[n]->print("Radio fake planes:        ");
+  serialConsole[n]->println(cfg.debugFakePlanes ? "ON" : "OFF");
+  serialConsole[n]->print("Move fake planes:        ");
+  serialConsole[n]->println(cfg.debugFakeMoving ? "ON" : "OFF");
+}
+void cliHelp(int n) {
+  serialConsole[n]->println();
+  serialConsole[n]->println("================= Commands =================");
+  serialConsole[n]->println("status            - Show whats going on");
+  serialConsole[n]->println("help              - List all commands");
+  serialConsole[n]->println("config            - List all settings");
+  serialConsole[n]->println("reboot            - Reset MCU and radio");
+  //serialConsole[n]->println("gpspos            - Show last GPS position");
+  //serialConsole[n]->println("fcpass            - start FC passthru mode");
+  serialConsole[n]->println("debug             - Toggle debug output");
+  serialConsole[n]->println("localfakeplanes   - Send fake planes to FC");
+  serialConsole[n]->println("radiofakeplanes   - Send fake planes via radio");
+  serialConsole[n]->println("movefakeplanes    - Move fake planes");
+}
+void cliConfig(int n) {
+  serialConsole[n]->println();
+  serialConsole[n]->println("=============== Configuration ==============");
 
 }
-void cliHelp(void) {
-  Serial.println();
-  Serial.println("================= Commands =================");
-  Serial.println("status            - Show whats going on");
-  Serial.println("help              - List all commands");
-  Serial.println("config            - List all settings");
-  Serial.println("reboot            - Reset MCU and radio");
-  //Serial.println("gpspos            - Show last GPS position");
-  //Serial.println("fcpass            - start FC passthru mode");
-  Serial.println("debug             - Toggle debug mode");
-}
-void cliConfig(void) {
-  Serial.println();
-  Serial.println("=============== Configuration ==============");
-
-}
-void cliDebug(void) {
-  Serial.println();
+void cliDebug(int n) {
+  serialConsole[n]->println();
   cfg.debugOutput = !cfg.debugOutput;
   saveConfig();
-  Serial.println("CLI debugging: " + String(cfg.debugOutput));
+  serialConsole[n]->println("CLI debugging: " + String(cfg.debugOutput));
 }
-void cliReboot(void) {
-  Serial.println();
-  Serial.println("Rebooting ...");
-  Serial.println();
+void cliLocalFake(int n) {
+  serialConsole[n]->println();
+  cfg.debugFakeWPs = !cfg.debugFakeWPs;
+  saveConfig();
+  serialConsole[n]->println("Local fake planes: " + String(cfg.debugFakeWPs));
+}
+void cliRadioFake(int n) {
+  serialConsole[n]->println();
+  cfg.debugFakePlanes = !cfg.debugFakePlanes;
+  saveConfig();
+  serialConsole[n]->println("Radio fake planes: " + String(cfg.debugFakePlanes));
+}
+void cliMoveFake(int n) {
+  serialConsole[n]->println();
+  cfg.debugFakeMoving = !cfg.debugFakeMoving;
+  saveConfig();
+  serialConsole[n]->println("Move fake planes: " + String(cfg.debugFakeMoving));
+}
+void cliReboot(int n) {
+  serialConsole[n]->println();
+  serialConsole[n]->println("Rebooting ...");
+  serialConsole[n]->println();
   delay(1000);
   ESP.restart();
 }
-void cliGPS(void) {
-  Serial.println();
-  Serial.println("================= GPS mode =================");
+void cliGPS(int n) {
+  serialConsole[n]->println();
+  serialConsole[n]->println("================= GPS mode =================");
 }
-void cliFCpass(void) {
-  Serial.println();
-  Serial.println("=============== FC passthru ================");
+void cliFCpass(int n) {
+  serialConsole[n]->println();
+  serialConsole[n]->println("=============== FC passthru ================");
+}
+
+void initCli () {
+  cli = new SimpleCLI();
+  cli->onNotFound = [](String str) {
+    Serial.println("\"" + str + "\" not found");
+  };
+  cli->addCmd(new Command("status", [](Cmd* cmd) { cliStatus(cNum); } ));
+  cli->addCmd(new Command("help", [](Cmd* cmd) { cliHelp(cNum); } ));
+  cli->addCmd(new Command("debug", [](Cmd* cmd) { cliConfig(cNum); } ));
+  cli->addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
+  cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
+  cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
+  cli->addCmd(new Command("reboot", [](Cmd* cmd) { cliReboot(cNum); } ));
+  cli->addCmd(new Command("gps", [](Cmd* cmd) { cliGPS(cNum); } ));
+
+  Command* ping = new Command("ping", [](Cmd* cmd) {
+    Serial.println(cmd->getValue(0));
+    Serial.println(cmd->getValue(1));
+  });
+  ping->addArg(new AnonymOptArg("ping!"));
+  ping->addArg(new AnonymOptArg("1"));
+
+  cli->addCmd(ping);
+  //cli->parse("ping");
+  //cli->parse("hello");
 }
 
 #endif
@@ -545,7 +563,10 @@ void setup() {
   cli.RegisterCmd("reboot",&cliReboot); */
 
   Serial.begin(115200);
-  //SerialBT.begin("ESP32");
+  serialConsole[0] = &Serial;
+  SerialBT.begin("ESP32");
+  serialConsole[1] = &SerialBT;
+
   initCli();
 
   initConfig();
@@ -560,6 +581,8 @@ void setup() {
     pds[i].pd.loraAddress= 0x00;
   }
   booted = 1;
+  serialConsole[0]->print("> ");
+  serialConsole[1]->print("> ");
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
@@ -587,6 +610,14 @@ void loop() {
       loraTX = 1;
       sendMessage(&pd);
       LoRa.receive();
+    }
+    if (pd.armState && bton) {
+      bton = 0;
+      SerialBT.end();
+    }
+    if (!pd.armState && !bton) {
+      bton = 1;
+      SerialBT.begin("ESP32");
     }
     pdLastTime = millis();
   }
