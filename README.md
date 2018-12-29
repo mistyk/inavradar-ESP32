@@ -76,7 +76,7 @@ A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testin
 To connect the ESP32 to the FC:
 - wire up +5V and GND
 - TX from FC to ESP RX pin 17
-- RX from FC to ESP TX ping 23
+- RX from FC to ESP TX pin 23
 
 Thanks for testing! 😄 👍
 
