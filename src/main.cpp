@@ -414,6 +414,7 @@ void getPlanetArmed () {
   msp.getActiveModes(&planeModes);
   //Serial.print("Arm State: ");
   //Serial.println(bitRead(planeModes,0));
+  pd.armState = bitRead(planeModes,0);
 }
 
 void getPlaneGPS () {
