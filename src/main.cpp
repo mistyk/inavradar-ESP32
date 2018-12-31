@@ -1,46 +1,56 @@
 #define RADARESP32
-//#define RADARATMEGA168
+//#define RADARAT168
 
 #include <lib/MSP.h>
 #include <lib/LoRa.h>
 #include <Arduino.h>
-#include "BluetoothSerial.h"
-#include <EEPROM.h>
+#include <SimpleCLI.h>
+using namespace simplecli;
 #include <main.h>
 
 #ifdef RADARESP32
 #include <SSD1306.h>
 #include <esp_system.h>
-//#include <lib/CLI.h>
-#include <SimpleCLI.h>
-using namespace simplecli;
-#define rxPin 17
-#define txPin 23
-#endif
+#include <BluetoothSerial.h>
+#include <EEPROM.h>
 
-#ifdef RADARATMEGA168
-#define rxPin 17
-#define txPin 23
-#endif
-//
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
 #define MOSI 27 // GPIO27 - SX1278's MOSI
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
-#define BAND 433E6 // 915E6
+
+#define rxPin 17
+#define txPin 23
+#endif
+
+#ifdef RADARAT168
+#define SCK 5 // GPIO5 - SX1278's SCK
+#define MISO 19 // GPIO19 - SX1278's MISO
+#define MOSI 27 // GPIO27 - SX1278's MOSI
+#define SS 18 // GPIO18 - SX1278's CS
+#define RST 14 // GPIO14 - SX1278's RESET
+#define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
+#define BAND  // 915E6
+
+#define rxPin 17
+#define txPin 23
+#endif
 
 #define CFGVER 2
 // ----------------------------------------------------------------------------- global vars
 config cfg;
-SSD1306 display (0x3c, 4, 15);
-BluetoothSerial SerialBT;
 MSP msp;
 bool booted = 0;
 bool bton = 1;
 Stream *serialConsole[2];
 int cNum = 0;
+
+#ifdef RADARESP32
+SSD1306 display (0x3c, 4, 15);
+BluetoothSerial SerialBT;
+#endif
 
 long sendLastTime = 0;
 long displayLastTime = 0;
@@ -57,18 +67,16 @@ bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
 planeData loraMsg; // incoming packet
 
-
 #ifdef RADARESP32
 // ----------------------------------------------------------------------------- EEPROM / config
 void saveConfig () {
-  //size_t size = sizeof(cfg);
-  //EEPROM.begin(size * 2);
   for(size_t i = 0; i < sizeof(cfg); i++) {
     char data = ((char *)&cfg)[i];
     EEPROM.write(i, data);
   }
   EEPROM.commit();
 }
+
 void initConfig () {
   size_t size = sizeof(cfg);
   EEPROM.begin(size * 2);
@@ -82,15 +90,15 @@ void initConfig () {
     cfg.loraAddress = 1; // local lora address
     cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
-    cfg.loraCodingRate4 = 6; // 6?
-    cfg.loraSpreadingFactor = 7; // 7?
+    cfg.loraCodingRate4 = 6; // Error correction rate 4/6
+    cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
     cfg.intervalSend = 300; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 10; // in sec
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
-    cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane)
+    cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane) # TODO
     cfg.debugOutput = true;
     cfg.debugFakeWPs = false;
     cfg.debugFakePlanes = false;
@@ -119,7 +127,6 @@ void readCli () {
   for (size_t i = 0; i <= 1; i++) {
     int sb;
     if(serialConsole[i]->available()) {
-    //Serial.print("reading Serial String: ");     //optional confirmation
       while (serialConsole[i]->available()){
         sb = serialConsole[i]->read();
         serInString[serInIndx] = sb;
@@ -136,8 +143,6 @@ void readCli () {
     }
   }
 }
-
-//Cli cli = Cli(Serial);
 void cliLog (String log) {
   if (cfg.debugOutput) {
     if (booted) {
@@ -150,7 +155,6 @@ void cliLog (String log) {
   }
 }
 void cliStatus(int n) {
-  //serialConsole[n]->println();
   serialConsole[n]->println("================== Status ==================");
   serialConsole[n]->print("FC:               ");
   serialConsole[n]->println(planeFC);
@@ -160,21 +164,14 @@ void cliStatus(int n) {
   serialConsole[n]->println(pd.armState ? "ARMED" : "DISARMED");
   serialConsole[n]->print("GPS:              ");
   serialConsole[n]->println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
-  serialConsole[n]->print("Local fake planes:        ");
-  serialConsole[n]->println(cfg.debugFakeWPs ? "ON" : "OFF");
-  serialConsole[n]->print("Radio fake planes:        ");
-  serialConsole[n]->println(cfg.debugFakePlanes ? "ON" : "OFF");
-  serialConsole[n]->print("Move fake planes:        ");
-  serialConsole[n]->println(cfg.debugFakeMoving ? "ON" : "OFF");
 }
 void cliHelp(int n) {
-  serialConsole[n]->println();
   serialConsole[n]->println("================= Commands =================");
   serialConsole[n]->println("status            - Show whats going on");
   serialConsole[n]->println("help              - List all commands");
   serialConsole[n]->println("config            - List all settings");
   serialConsole[n]->println("reboot            - Reset MCU and radio");
-  //serialConsole[n]->println("gpspos            - Show last GPS position");
+  serialConsole[n]->println("gpspos            - Show last GPS position");
   //serialConsole[n]->println("fcpass            - start FC passthru mode");
   serialConsole[n]->println("debug             - Toggle debug output");
   serialConsole[n]->println("localfakeplanes   - Send fake planes to FC");
@@ -182,47 +179,72 @@ void cliHelp(int n) {
   serialConsole[n]->println("movefakeplanes    - Move fake planes");
 }
 void cliConfig(int n) {
-  serialConsole[n]->println();
   serialConsole[n]->println("=============== Configuration ==============");
-
+  serialConsole[n]->print("Lora local address:    ");
+  serialConsole[n]->println(cfg.loraAddress);
+  serialConsole[n]->print("Lora frequency:        ");
+  serialConsole[n]->print(cfg.loraFrequency);
+  serialConsole[n]->println(" Hz");
+  serialConsole[n]->print("Lora bandwidth:        ");
+  serialConsole[n]->print(cfg.loraBandwidth);
+  serialConsole[n]->println(" b/s");
+  serialConsole[n]->print("Lora spreading factor: ");
+  serialConsole[n]->println(cfg.loraSpreadingFactor);
+  serialConsole[n]->print("Lora coding rate 4:    ");
+  serialConsole[n]->println(cfg.loraCodingRate4);
+  serialConsole[n]->print("UAV timeout:           ");
+  serialConsole[n]->print(cfg.uavTimeout);
+  serialConsole[n]->println(" sec");
+  serialConsole[n]->print("MSP RX pin:            ");
+  serialConsole[n]->println(cfg.mspRX);
+  serialConsole[n]->print("MSP TX pin:            ");
+  serialConsole[n]->println(cfg.mspTX);
+  serialConsole[n]->print("Debug output:          ");
+  serialConsole[n]->println(cfg.debugOutput ? "ON" : "OFF");
+  serialConsole[n]->print("Local fake planes:     ");
+  serialConsole[n]->println(cfg.debugFakeWPs ? "ON" : "OFF");
+  serialConsole[n]->print("Radio fake planes:     ");
+  serialConsole[n]->println(cfg.debugFakePlanes ? "ON" : "OFF");
+  serialConsole[n]->print("Move fake planes:      ");
+  serialConsole[n]->println(cfg.debugFakeMoving ? "ON" : "OFF");
 }
 void cliDebug(int n) {
-  serialConsole[n]->println();
   cfg.debugOutput = !cfg.debugOutput;
   saveConfig();
   serialConsole[n]->println("CLI debugging: " + String(cfg.debugOutput));
 }
 void cliLocalFake(int n) {
-  serialConsole[n]->println();
   cfg.debugFakeWPs = !cfg.debugFakeWPs;
   saveConfig();
   serialConsole[n]->println("Local fake planes: " + String(cfg.debugFakeWPs));
 }
 void cliRadioFake(int n) {
-  serialConsole[n]->println();
   cfg.debugFakePlanes = !cfg.debugFakePlanes;
   saveConfig();
   serialConsole[n]->println("Radio fake planes: " + String(cfg.debugFakePlanes));
 }
 void cliMoveFake(int n) {
-  serialConsole[n]->println();
   cfg.debugFakeMoving = !cfg.debugFakeMoving;
   saveConfig();
   serialConsole[n]->println("Move fake planes: " + String(cfg.debugFakeMoving));
 }
 void cliReboot(int n) {
-  serialConsole[n]->println();
   serialConsole[n]->println("Rebooting ...");
   serialConsole[n]->println();
   delay(1000);
   ESP.restart();
 }
-void cliGPS(int n) {
-  serialConsole[n]->println();
-  serialConsole[n]->println("================= GPS mode =================");
+void cliGPSpos(int n) {
+  serialConsole[n]->print("Status: ");
+  serialConsole[n]->println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
+  serialConsole[n]->print("Position: ");
+  serialConsole[n]->print(pd.gps.lat/10000000);
+  serialConsole[n]->print(",");
+  serialConsole[n]->print(pd.gps.lon/10000000);
+  serialConsole[n]->print(",");
+  serialConsole[n]->println(pd.gps.alt);
 }
 void cliFCpass(int n) {
-  serialConsole[n]->println();
   serialConsole[n]->println("=============== FC passthru ================");
 }
 
@@ -238,20 +260,65 @@ void initCli () {
   cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
   cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
   cli->addCmd(new Command("reboot", [](Cmd* cmd) { cliReboot(cNum); } ));
-  cli->addCmd(new Command("gps", [](Cmd* cmd) { cliGPS(cNum); } ));
+  cli->addCmd(new Command("gpspos", [](Cmd* cmd) { cliGPSpos(cNum); } ));
 
-  Command* ping = new Command("ping", [](Cmd* cmd) {
-    Serial.println(cmd->getValue(0));
-    Serial.println(cmd->getValue(1));
+  Command* config = new Command("config", [](Cmd* cmd) {
+    String arg1 = cmd->getValue(0);
+    String arg2 = cmd->getValue(1);
+    if (arg1 == "") cliConfig(cNum);
+    if (arg1 == "loraFreq") {
+      if ( arg2.toInt() == 433E6 || arg2.toInt() == 868E6 || arg2.toInt() == 915E6) {
+        cfg.loraFrequency = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora frequency changed!");
+      } else {
+        serialConsole[cNum]->println("Lora frequency not correct: 433000000, 868000000, 915000000");
+      }
+    }
+    if (arg1 == "loraBandwidth") {
+      if (arg2.toInt() == 250000 || arg2.toInt() == 62500 || arg2.toInt() == 7800) {
+        cfg.loraBandwidth = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora bandwidth changed!");
+      } else {
+        serialConsole[cNum]->println("Lora bandwidth not correct: 250000, 62500, 7800");
+      }
+    }
+    if (arg1 == "loraSpread") {
+    if (arg2.toInt() >= 7 && arg2.toInt() <= 12) {
+        cfg.loraSpreadingFactor = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora spreading factor changed!");
+      } else {
+        serialConsole[cNum]->println("Lora Lora spreading factor not correct: 7 - 12");
+      }
+    }
+    if (arg1 == "loraAddress") {
+      if (arg2.toInt() >= 1 && arg2.toInt() <= 250) {
+        cfg.loraAddress = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora address changed!");
+      } else {
+        serialConsole[cNum]->println("Lora address not correct: 1 - 250");
+      }
+    }
+    if (arg1 == "uavtimeout") {
+      if (arg2.toInt() >= 5 && arg2.toInt() <= 600) {
+        cfg.uavTimeout = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("UAV timeout changed!");
+      } else {
+        serialConsole[cNum]->println("UAV timeout not correct: 5 - 600");
+      }
+    }
   });
-  ping->addArg(new AnonymOptArg("ping!"));
-  ping->addArg(new AnonymOptArg("1"));
+  config->addArg(new AnonymOptArg(""));
+  config->addArg(new AnonymOptArg(""));
 
-  cli->addCmd(ping);
+  cli->addCmd(config);
   //cli->parse("ping");
   //cli->parse("hello");
 }
-
 #endif
 // ----------------------------------------------------------------------------- LoRa
 void sendMessage(planeData *outgoing) {
@@ -351,7 +418,7 @@ void initLora() {
   String(cfg.loraHeader).toCharArray(pd.header,7);
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
-  if (!LoRa.begin(BAND)) {
+  if (!LoRa.begin(cfg.loraFrequency)) {
     cliLog("Radio start failed!");
     #ifdef RADARESP32
     display.drawString (94, 8, "FAIL");
@@ -359,9 +426,9 @@ void initLora() {
     while (1);
   }
   LoRa.sleep();
-  LoRa.setSignalBandwidth(250000);
-  LoRa.setCodingRate4(6);
-  LoRa.setSpreadingFactor(7);
+  LoRa.setSignalBandwidth(cfg.loraBandwidth);
+  LoRa.setCodingRate4(cfg.loraCodingRate4);
+  LoRa.setSpreadingFactor(cfg.loraSpreadingFactor);
   LoRa.idle();
   LoRa.onReceive(onReceive);
   LoRa.enableCrc();
@@ -551,7 +618,7 @@ void initMSP () {
   display.display();
   #endif
   delay(200);
-  Serial1.begin(115200, SERIAL_8N1, rxPin , txPin);
+  Serial1.begin(115200, SERIAL_8N1, cfg.mspRX , cfg.mspTX);
   msp.begin(Serial1);
   cliLog("MSP started!");
   #ifdef RADARESP32
