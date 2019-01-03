@@ -32,7 +32,7 @@ using namespace simplecli;
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
-#define BAND  // 915E6
+
 
 #define rxPin 17
 #define txPin 23
