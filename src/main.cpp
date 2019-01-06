@@ -38,7 +38,7 @@ using namespace simplecli;
 #define txPin 23
 #endif
 
-#define CFGVER 2
+#define CFGVER 5 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -87,12 +87,12 @@ void initConfig () {
   if (cfg.configVersion != CFGVER) { // write default config
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
-    cfg.loraAddress = 1; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraAddress = 2; // local lora address
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
-    cfg.intervalSend = 300; // in ms + random
+    cfg.intervalSend = 500; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 10; // in sec
@@ -164,6 +164,7 @@ void cliStatus(int n) {
   serialConsole[n]->println(pd.armState ? "ARMED" : "DISARMED");
   serialConsole[n]->print("GPS:              ");
   serialConsole[n]->println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
+  serialConsole[n]->println("statusend");
 }
 void cliHelp(int n) {
   serialConsole[n]->println("================= Commands =================");
@@ -207,6 +208,7 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.debugFakePlanes ? "ON" : "OFF");
   serialConsole[n]->print("Move fake planes:      ");
   serialConsole[n]->println(cfg.debugFakeMoving ? "ON" : "OFF");
+  serialConsole[n]->println("cfgend");
 }
 void cliDebug(int n) {
   cfg.debugOutput = !cfg.debugOutput;
@@ -337,7 +339,7 @@ void onReceive(int packetSize) {
       pdIn = loraMsg;
       cliLog("New air packet");
       bool found = 0;
-      size_t free = 0;
+      int free = -1;
       for (size_t i = 0; i <= 4; i++) {
         if (pds[i].pd.loraAddress == pdIn.loraAddress ) { // update plane
           pds[i].pd = pdIn;
@@ -345,8 +347,9 @@ void onReceive(int packetSize) {
           pds[i].lastUpdate = millis();
           found = 1;
           cliLog("UAV DB update POI #" + String(i+1));
+          break;
         }
-        if (!free && pds[i].waypointNumber == 0) free = i; // find free slot
+        if (free == -1 && pds[i].waypointNumber == 0) free = i; // find free slot
       }
       if (!found) { // if not there put it in free slot
           pds[free].waypointNumber = free+1;
@@ -366,23 +369,24 @@ void sendFakePlanes () {
   }
   cliLog("Sending fake UAVs via radio ...");
   String("ADS-RC").toCharArray(fakepd.header,7);
-  fakepd.loraAddress = (char)1;
+  fakepd.loraAddress = (char)5;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
-  fakepd.gps.lat = homepos.lat + (10 * moving);
-  fakepd.gps.lon = homepos.lon;
+//  fakepd.gps.lat = homepos.lat + (10 * moving);
+//  fakepd.gps.lon = homepos.lon;
   fakepd.gps.alt = 100;
   fakepd.gps.groundSpeed = 50;
-  sendMessage(&fakepd);
-  delay(300);
+  //sendMessage(&fakepd);
+  //delay(300);
   /*
   fakepd.loraAddress = (char)2;
   String("Testplane #2").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1;
+  fakepd.armState=  1; */
+  // -------------------------------------------------------- fixed GPS pos radio fake planes
   fakepd.gps.lat = 50.100627 * 10000000 + (1000 * moving);
   fakepd.gps.lon = 8.762765 * 10000000;
   sendMessage(&fakepd);
-  delay(300);
+/*  delay(600);
   fakepd.loraAddress = (char)3;
   String("Testplane #3").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
@@ -521,11 +525,12 @@ void planeSetWP () {
       wp.p1 = pds[i].pd.gps.groundSpeed;
       wp.p2 = 0;
       wp.p3 = 0;
-      if (i == 4 || pds[i+1].waypointNumber!=0) wp.flag = 0xa5;
+      if (i == 4 || pds[i+1].waypointNumber==0) wp.flag = 0xa5;
       else wp.flag = 0;
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
+      cliLog("POI #" + String(wp.waypointNumber));
     }
-    else break;
+    //else break;
   }
   cliLog("POIs sent to FC.");
   //msp.command(MSP_SET_WP, &wp, sizeof(wp));
@@ -665,6 +670,7 @@ void setup() {
 
   for (size_t i = 0; i <= 4; i++) {
     pds[i].pd.loraAddress= 0x00;
+    pds[i].waypointNumber = 0;
   }
   booted = 1;
   serialConsole[0]->print("> ");
@@ -709,8 +715,8 @@ void loop() {
     pdLastTime = millis();
   }
 
-  if (millis() - sendLastTime > cfg.intervalSend + random(0, 20)) {
-
+  if ((millis() - sendLastTime) > cfg.intervalSend ) { //+ random(0, 20)
+    sendLastTime = millis();
 
     if (pd.armState) {
       getPlaneGPS();
@@ -719,9 +725,10 @@ void loop() {
       LoRa.receive();
     }
     if (cfg.debugFakePlanes) sendFakePlanes();
-    if (pd.armState) planeSetWP();
+    //if (pd.armState) planeSetWP();
+    planeSetWP();
     if (cfg.debugFakeWPs) planeFakeWP();
     //planeFakeWPv2();
-    sendLastTime = millis();
+
   }
 }

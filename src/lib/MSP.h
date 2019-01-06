@@ -69,6 +69,10 @@
 #define MSP_SET_RAW_RC           200 // 8 rc chan
 #define MSP_SET_RAW_GPS          201 // fix, numsat, lat, lon, alt, speed
 #define MSP_SET_WP               209 // sets a given WP (WP#, lat, lon, alt, flags)
+
+// inav radar
+#define MSP_SET_RADAR_NAV        248    //SET inav Radar options
+
 // v2 commands
 #define MSP2_ESP32 							 0x2040
 
@@ -650,7 +654,10 @@ struct msp_raw_planes_t {
   char callsign2;
 } __attribute__((packed));
 
-
+typedef struct inav_radar_setup_s  {
+    bool frontview;
+    int8_t scale;
+} inav_radar_setup_t;
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
