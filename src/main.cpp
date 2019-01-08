@@ -20,9 +20,6 @@ using namespace simplecli;
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
-
-#define rxPin 17
-#define txPin 23
 #endif
 
 #ifdef RADARAT168
@@ -32,10 +29,6 @@ using namespace simplecli;
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
-
-
-#define rxPin 17
-#define txPin 23
 #endif
 
 #define CFGVER 5 // bump up to overwrite setting with new defaults
@@ -115,6 +108,40 @@ void initConfig () {
   } else {
     Serial.println("Config found!");
   }
+}
+// ----------------------------------------------------------------------------- calc gps distance
+#include <math.h>
+#include <cmath>
+#define earthRadiusKm 6371.0
+
+// This function converts decimal degrees to radians
+double deg2rad(double deg) {
+  return (deg * M_PI / 180);
+}
+
+//  This function converts radians to decimal degrees
+double rad2deg(double rad) {
+  return (rad * 180 / M_PI);
+}
+
+/**
+ * Returns the distance between two points on the Earth.
+ * Direct translation from http://en.wikipedia.org/wiki/Haversine_formula
+ * @param lat1d Latitude of the first point in degrees
+ * @param lon1d Longitude of the first point in degrees
+ * @param lat2d Latitude of the second point in degrees
+ * @param lon2d Longitude of the second point in degrees
+ * @return The distance between the two points in kilometers
+ */
+double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
+  double lat1r, lon1r, lat2r, lon2r, u, v;
+  lat1r = deg2rad(lat1d);
+  lon1r = deg2rad(lon1d);
+  lat2r = deg2rad(lat2d);
+  lon2r = deg2rad(lon2d);
+  u = sin((lat2r - lat1r)/2);
+  v = sin((lon2r - lon1r)/2);
+  return 2.0 * earthRadiusKm * asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
 }
 // ----------------------------------------------------------------------------- CLI
 SimpleCLI* cli;
@@ -346,8 +373,9 @@ void onReceive(int packetSize) {
       bool found = 0;
       int free = -1;
       for (size_t i = 0; i <= 4; i++) {
-        if (pds[i].pd.loraAddress == pdIn.loraAddress ) { // update plane
+        if (String(pds[i].pd.planeName) == String(pdIn.planeName) ) { // update plane
           pds[i].pd = pdIn;
+          pds[i].pd.armState = 1;
           pds[i].waypointNumber = i+1;
           pds[i].lastUpdate = millis();
           found = 1;
@@ -359,6 +387,7 @@ void onReceive(int packetSize) {
       if (!found) { // if not there put it in free slot
           pds[free].waypointNumber = free+1;
           pds[free].pd = pdIn;
+          pds[free].pd.armState = 1;
           pds[free].lastUpdate = millis();
           cliLog("UAV DB new POI #" + String(free+1));
           free = 0;
@@ -465,7 +494,10 @@ void drawDisplay () {
     display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
 
     for (size_t i = 0; i <=4 ; i++) {
-      if (pds[i].waypointNumber != 0) display.drawString (0,i*8, pds[i].pd.planeName);
+      if (pds[i].waypointNumber != 0) {
+        display.drawString (0,i*8, pds[i].pd.planeName);
+        display.drawString (80,i*8,String(pds[i].distance));
+      }
     }
   } else {
     display.setFont (ArialMT_Plain_24);
@@ -533,7 +565,7 @@ void planeSetWP () {
       wp.alt = pds[i].pd.gps.alt;
       wp.p1 = pds[i].pd.gps.groundSpeed;
       wp.p2 = 0;
-      wp.p3 = 0;
+      wp.p3 = pds[i].pd.armState;
       if (i == 4 || pds[i+1].waypointNumber==0) wp.flag = 0xa5;
       else wp.flag = 0;
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
@@ -693,18 +725,26 @@ void loop() {
     drawDisplay();
     readCli();
     #endif
-    for (size_t i = 0; i <= 4; i++) {
-      if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
-        pds[i].waypointNumber = 0;
-        pds[i].pd.loraAddress = 0;
-        cliLog("UAV DB delete POI #" + String(i+1));
-      }
-    }
+
     loraTX = 0;
     loraRX = 0;
     displayLastTime = millis();
   }
   if (millis() - pdLastTime > cfg.intervalStatus) {
+    for (size_t i = 0; i <= 4; i++) {
+      if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
+      if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
+        pds[i].pd.gps.lat = 0;
+        pds[i].pd.gps.lon = 0;
+        pds[i].pd.gps.alt = 0;
+        pds[i].pd.armState = 2;
+        planeSetWP();
+        pds[i].waypointNumber = 0;
+        pds[i].pd.loraAddress = 0;
+        String("").toCharArray(pds[i].pd.planeName,20);
+        cliLog("UAV DB delete POI #" + String(i+1));
+      }
+    }
     getPlaneData();
     dalternate = !dalternate;
     if (String(pd.planeName) != "No FC" ) {
