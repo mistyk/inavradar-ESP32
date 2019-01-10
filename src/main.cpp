@@ -396,7 +396,7 @@ void onReceive(int packetSize) {
 }
 int moving = 0;
 void sendFakePlanes () {
-  if (cfg.debugFakeMoving && moving > 10) {
+  if (cfg.debugFakeMoving && moving > 100) {
     moving = 0;
   } else {
     moving = 0;
@@ -417,17 +417,19 @@ void sendFakePlanes () {
   String("Testplane #2").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
-  fakepd.gps.lat = 50.100627 * 10000000 + (1000 * moving);
+
+  fakepd.gps.lat = 50.100627 * 10000000 + (10000 * moving);
   fakepd.gps.lon = 8.762765 * 10000000;
   sendMessage(&fakepd);
-/*  delay(600);
-  fakepd.loraAddress = (char)3;
-  String("Testplane #3").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1;
-  fakepd.gps.lat = 50.100679 * 10000000;
-  fakepd.gps.lon = 8.762159 * 10000000 + (1000 * moving);
-  sendMessage(&fakepd);
-  delay(300);
+  // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
+  //delay(600);
+  //fakepd.loraAddress = (char)3;
+  //String("Testplane #3").toCharArray(fakepd.planeName,20);
+  //fakepd.armState=  1;
+  //fakepd.gps.lat = 50.088233 * 10000000;
+  //fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
+  //sendMessage(&fakepd);
+  /*delay(300);
   fakepd.loraAddress = (char)4;
   String("Testplane #4").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
@@ -558,7 +560,7 @@ void planeSetWP () {
   msp_set_wp_t wp;
   for (size_t i = 0; i <= 4; i++) {
     if (pds[i].waypointNumber != 0) {
-      wp.waypointNumber = pds[i].waypointNumber;
+      wp.waypointNumber = pds[i].waypointNumber+19;
       wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
       wp.lat = pds[i].pd.gps.lat;
       wp.lon = pds[i].pd.gps.lon;
@@ -593,7 +595,7 @@ void planeFakeWPv2 () {
 
 void planeFakeWP () {
     msp_set_wp_t wp;
-    if (cfg.debugFakeMoving && moving > 10) {
+    if (cfg.debugFakeMoving && moving > 100) {
       moving = 0;
     } else {
       moving = 0;
@@ -643,7 +645,7 @@ void planeFakeWP () {
     if (pd.gps.fixType > 0) {
       wp.waypointNumber = 1;
       wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-      wp.lat = homepos.lat-100 + (moving * 10);
+      wp.lat = homepos.lat-100 + (moving * 20);
       wp.lon = homepos.lon;
       wp.alt = homepos.alt + 300;
       wp.p1 = 1000;
@@ -734,9 +736,9 @@ void loop() {
     for (size_t i = 0; i <= 4; i++) {
       if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
       if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
-        pds[i].pd.gps.lat = 0;
-        pds[i].pd.gps.lon = 0;
-        pds[i].pd.gps.alt = 0;
+        //pds[i].pd.gps.lat = 0;
+        //pds[i].pd.gps.lon = 0;
+        //pds[i].pd.gps.alt = 0;
         pds[i].pd.armState = 2;
         planeSetWP();
         pds[i].waypointNumber = 0;
