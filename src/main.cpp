@@ -399,7 +399,7 @@ void sendFakePlanes () {
   if (cfg.debugFakeMoving && moving > 100) {
     moving = 0;
   } else {
-    moving = 0;
+    if (!cfg.debugFakeMoving) moving = 0;
   }
   cliLog("Sending fake UAVs via radio ...");
   String("ADS-RC").toCharArray(fakepd.header,7);
@@ -418,7 +418,7 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 50.100627 * 10000000 + (10000 * moving);
+  fakepd.gps.lat = 50.100627 * 10000000 + (700 * moving);
   fakepd.gps.lon = 8.762765 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
@@ -429,14 +429,14 @@ void sendFakePlanes () {
   //fakepd.gps.lat = 50.088233 * 10000000;
   //fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
   //sendMessage(&fakepd);
-  /*delay(300);
+  delay(300);
   fakepd.loraAddress = (char)4;
   String("Testplane #4").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
   fakepd.gps.lat = 50.099836 * 10000000;
   fakepd.gps.lon = 8.762406 * 10000000 + (1000 * moving);
   sendMessage(&fakepd);
-  delay(300);
+  delay(300);/*
   fakepd.loraAddress = (char)5;
   String("Testplane #5").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
@@ -560,7 +560,7 @@ void planeSetWP () {
   msp_set_wp_t wp;
   for (size_t i = 0; i <= 4; i++) {
     if (pds[i].waypointNumber != 0) {
-      wp.waypointNumber = pds[i].waypointNumber+19;
+      wp.waypointNumber = pds[i].waypointNumber;
       wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
       wp.lat = pds[i].pd.gps.lat;
       wp.lon = pds[i].pd.gps.lon;
@@ -568,7 +568,10 @@ void planeSetWP () {
       wp.p1 = pds[i].pd.gps.groundSpeed;
       wp.p2 = 0;
       wp.p3 = pds[i].pd.armState;
-      if (i == 4 || pds[i+1].waypointNumber==0) wp.flag = 0xa5;
+      if (i == 4 || pds[i+1].waypointNumber==0) {
+        wp.flag = 0xa5;
+        cliLog("last flag");
+      }
       else wp.flag = 0;
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
       cliLog("POI #" + String(wp.waypointNumber));
