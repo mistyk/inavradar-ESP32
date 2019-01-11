@@ -570,15 +570,15 @@ void planeSetWP () {
       wp.p3 = pds[i].pd.armState;
       if (i == 4 || pds[i+1].waypointNumber==0) {
         wp.flag = 0xa5;
-        cliLog("last flag");
+        cliLog("last flag - POI #" + String(wp.waypointNumber));
       }
       else wp.flag = 0;
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
-      cliLog("POI #" + String(wp.waypointNumber));
+      cliLog("Sent to FC - POI #" + String(wp.waypointNumber));
     }
     //else break;
   }
-  cliLog("POIs sent to FC.");
+  //cliLog("POIs sent to FC.");
   //msp.command(MSP_SET_WP, &wp, sizeof(wp));
 }
 void planeFakeWPv2 () {
