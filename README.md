@@ -82,3 +82,4 @@ Thanks for testing! 😄 👍
 
 ## Contact
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
+[Patreon](https://www.patreon.com/inavradar)
