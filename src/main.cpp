@@ -31,7 +31,7 @@ using namespace simplecli;
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 #endif
 
-#define CFGVER 5 // bump up to overwrite setting with new defaults
+#define CFGVER 6 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -408,7 +408,7 @@ void sendFakePlanes () {
   fakepd.armState=  1;
 //  fakepd.gps.lat = homepos.lat + (10 * moving);
 //  fakepd.gps.lon = homepos.lon;
-  fakepd.gps.alt = 100;
+  fakepd.gps.alt = 900;
   fakepd.gps.groundSpeed = 50;
   //sendMessage(&fakepd);
   //delay(300);
@@ -418,25 +418,27 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 50.100627 * 10000000 + (700 * moving);
-  fakepd.gps.lon = 8.762765 * 10000000;
+  fakepd.gps.lat = 50.100400 * 10000000 + (500 * moving);
+  fakepd.gps.lon = 8.762835 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
-  //delay(600);
-  //fakepd.loraAddress = (char)3;
-  //String("Testplane #3").toCharArray(fakepd.planeName,20);
-  //fakepd.armState=  1;
-  //fakepd.gps.lat = 50.088233 * 10000000;
-  //fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
-  //sendMessage(&fakepd);
+  // 50.100400, 8.762835
+  delay(600);/*
+  fakepd.loraAddress = (char)3;
+  String("Testplane #3").toCharArray(fakepd.planeName,20);
+  fakepd.armState=  1;
+  fakepd.gps.lat = 50.088233 * 10000000;
+  fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
+  sendMessage(&fakepd);
   delay(300);
   fakepd.loraAddress = (char)4;
   String("Testplane #4").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
-  fakepd.gps.lat = 50.099836 * 10000000;
-  fakepd.gps.lon = 8.762406 * 10000000 + (1000 * moving);
+  fakepd.gps.lat = 50.088233 * 10000000;
+  fakepd.gps.lon = 8.782278 * 10000000 + (600 * moving);
+  fakepd.gps.alt = 500;
   sendMessage(&fakepd);
-  delay(300);/*
+  delay(300);
   fakepd.loraAddress = (char)5;
   String("Testplane #5").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
@@ -653,7 +655,7 @@ void planeFakeWP () {
       wp.alt = homepos.alt + 300;
       wp.p1 = 1000;
       wp.p2 = 0;
-      wp.p3 = 0;
+      wp.p3 = 1;
       wp.flag = 0xa5;
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
       cliLog("Fake POIs sent to FC.");
@@ -743,6 +745,7 @@ void loop() {
         //pds[i].pd.gps.lon = 0;
         //pds[i].pd.gps.alt = 0;
         pds[i].pd.armState = 2;
+        planeSetWP();
         planeSetWP();
         pds[i].waypointNumber = 0;
         pds[i].pd.loraAddress = 0;
