@@ -31,7 +31,7 @@ using namespace simplecli;
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 #endif
 
-#define CFGVER 6 // bump up to overwrite setting with new defaults
+#define CFGVER 8 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -195,7 +195,7 @@ void cliStatus(int n) {
   serialConsole[n]->print("Arm state:        ");
   serialConsole[n]->println(pd.armState ? "ARMED" : "DISARMED");
   serialConsole[n]->print("GPS:              ");
-  serialConsole[n]->println(pd.gps.fixType ? String(pd.gps.numSat) + " Sats" : "no fix");
+  serialConsole[n]->println(String(pd.gps.numSat) + " Sats");
   serialConsole[n]->println("statusend");
 }
 void cliHelp(int n) {
@@ -220,7 +220,7 @@ void cliConfig(int n) {
   serialConsole[n]->println(" Hz");
   serialConsole[n]->print("Lora bandwidth:        ");
   serialConsole[n]->print(cfg.loraBandwidth);
-  serialConsole[n]->println(" b/s");
+  serialConsole[n]->println(" Hz");
   serialConsole[n]->print("Lora spreading factor: ");
   serialConsole[n]->println(cfg.loraSpreadingFactor);
   serialConsole[n]->print("Lora coding rate 4:    ");
@@ -364,8 +364,8 @@ void sendMessage(planeData *outgoing) {
 void onReceive(int packetSize) {
   if (packetSize == 0) return;
   LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
-  cliLog(loraMsg.header);
-  cliLog(cfg.loraHeader);
+  //cliLog(loraMsg.header);
+  //cliLog(cfg.loraHeader);
   if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
       loraRX = 1;
       pdIn = loraMsg;
@@ -423,13 +423,13 @@ void sendFakePlanes () {
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
   // 50.100400, 8.762835
-  delay(600);/*
+  delay(300);
   fakepd.loraAddress = (char)3;
   String("Testplane #3").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
-  fakepd.gps.lat = 50.088233 * 10000000;
-  fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
-  sendMessage(&fakepd);
+  fakepd.gps.lat = 50.100400 * 10000000;
+  fakepd.gps.lon = 8.762835 * 10000000 + (341 * moving);
+  sendMessage(&fakepd); /*
   delay(300);
   fakepd.loraAddress = (char)4;
   String("Testplane #4").toCharArray(fakepd.planeName,20);
@@ -568,8 +568,10 @@ void planeSetWP () {
       wp.lon = pds[i].pd.gps.lon;
       wp.alt = pds[i].pd.gps.alt;
       wp.p1 = pds[i].pd.gps.groundSpeed;
+      cliLog("P1:" + String(wp.p1));
       wp.p2 = 0;
       wp.p3 = pds[i].pd.armState;
+      cliLog("P3:" + String(wp.p3));
       if (i == 4 || pds[i+1].waypointNumber==0) {
         wp.flag = 0xa5;
         cliLog("last flag - POI #" + String(wp.waypointNumber));

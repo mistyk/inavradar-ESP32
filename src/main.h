@@ -9,7 +9,7 @@ struct config {
   uint16_t intervalSend; // in ms + random
   uint16_t intervalDisplay; // in ms
   uint16_t intervalStatus; // in ms
-  uint8_t uavTimeout; // in sec
+  uint16_t uavTimeout; // in sec
   uint8_t mspTX; // pin for msp serial TX
   uint8_t mspRX; // pin for msp serial RX
   uint8_t mspPOI; // POI type: 1 (Wayponit), 2 (Plane)
