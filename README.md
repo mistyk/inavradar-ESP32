@@ -1,4 +1,4 @@
-![Logo](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/logo.PNG)
+![Logo](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/logo.png)
 
 # INAV - Radar
 LoRa based inter UAV communication
