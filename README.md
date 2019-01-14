@@ -34,7 +34,7 @@ It's a fork from the INAV repo and instructions how to build can be found [here]
 
 INAV-Radar is currently no part of the INAV flight control software. INAV can be found [here](https://github.com/iNavFlight/inav).
 
-## Testing communication between ESP32 Lora modules
+## Testing communication between ESP32 Lora modules and FCs
 For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
 
 Your system needs the driver for the USB UART bridge:
