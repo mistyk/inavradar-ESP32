@@ -43,8 +43,9 @@ Your system needs the driver for the USB UART bridge:
 
 Also you will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
 
+Be sure to check 'Add Python to path':
 ![Python Setup](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/python.png)
-Be sure to check 'Add Python to path'.
+
 
 The latest stable esptool.py release can be installed via pip in your command prompt:
 
