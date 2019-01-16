@@ -1,0 +1,12 @@
+.hidden {
+  display: none;
+}
+.padded {
+  padding: 0 16px;
+}
+.checkmargin {
+  margin-right: 16px;
+}
+.logo {
+  width: 100%;
+}

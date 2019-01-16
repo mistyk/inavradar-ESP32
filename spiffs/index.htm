@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+  <link rel="stylesheet" href="phonon.css" />
+  <link rel="stylesheet" href="main.css" />
+  <title>App</title>
+</head>
+<body>
+  <radiosettings data-page="true" class="app-page">
+    <header class="header-bar">
+      <div class="left">
+        <button class="btn pull-left icon icon-arrow-back" data-navigation="home"></button>
+        <h1 class="title">Settings</h1>
+      </div>
+    </header>
+    <div class="content">
+      <ul class="list" id="slist">
+      </ul>
+    </div>
+  </radiosettings>
+
+  <suboptions data-page="true" class="app-page">
+    <header class="header-bar">
+      <div class="left">
+        <button class="btn pull-left icon icon-arrow-back" data-navigation="radiosettings"></button>
+        <h1 class="title" id="subtitle"></h1>
+      </div>
+    </header>
+    <div class="content" id="subcontent">
+    </div>
+  </suboptions>
+
+  <home data-page="true" class="app-page">
+    <header class="header-bar">
+      <a id="connectButton" class="btn pull-left icon icon-sync-problem"></a>
+      <div class="center">
+        <h1 class="title">INAV-Radar</h1>
+      </div>
+      <a class="btn pull-right icon icon-settings" href="#!radiosettings"></a>
+    </header>
+    <div class="content">
+      <div class="padded-full" id="rstatus">
+        <h3 id="connectedto">Connected to </h3>
+        <span id="armed">DISARMED</span><br>
+        <span id="battery">0.00 V</span><br>
+        <span id="gpsstatus">GPS</span><br>
+        <br>
+        <table class="table" style="width:100%;">
+          <tr>
+              <thead>
+                  <th>UAV Name</th>
+                  <th>State</th>
+                  <th>Position</th>
+              </thead>
+          </tr>
+          <tbody>
+
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </home>
+
+    <script src="phonon.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

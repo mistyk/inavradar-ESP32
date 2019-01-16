@@ -11,8 +11,17 @@ using namespace simplecli;
 #ifdef RADARESP32
 #include <SSD1306.h>
 #include <esp_system.h>
-#include <BluetoothSerial.h>
 #include <EEPROM.h>
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <SPIFFS.h>
+#include <ArduinoOTA.h>
+#include <FS.h>
+#include <Hash.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <SPIFFSEditor.h>
+#include <lib/ESPAsyncWiFiManager.h>
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -36,14 +45,17 @@ using namespace simplecli;
 config cfg;
 MSP msp;
 bool booted = 0;
-bool bton = 0;
-Stream *serialConsole[2];
+Stream *serialConsole[1];
 int cNum = 0;
 bool dalternate = 1;
 
 #ifdef RADARESP32
 SSD1306 display (0x3c, 4, 15);
-BluetoothSerial SerialBT;
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+AsyncEventSource events("/events");
+DNSServer dns;
+AsyncWiFiManager wifiManager(&server,&dns);
 #endif
 
 long sendLastTime = 0;
@@ -57,7 +69,7 @@ planeData pdIn; // new air packet
 planesData pds[5]; // uav db
 planeData fakepd; // debugging
 char planeFC[20]; // uav fc name
-
+bool wifiON = 1;
 bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
 planeData loraMsg; // incoming packet
@@ -143,6 +155,23 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
   v = sin((lon2r - lon1r)/2);
   return 2.0 * earthRadiusKm * asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
 }
+// ----------------------------------------------------------------------------- String split
+
+String getValue(String data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length() - 1;
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
 // ----------------------------------------------------------------------------- CLI
 SimpleCLI* cli;
 
@@ -153,21 +182,19 @@ int  serInIndx  = 0;    // index of serInString[] in which to insert the next in
 int  serOutIndx = 0;    // index of the outgoing serInString[] array;
 
 void readCli () {
-  for (size_t i = 0; i <= 1; i++) {
-    int sb;
-    if(serialConsole[i]->available()) {
-      while (serialConsole[i]->available()){
-        sb = serialConsole[i]->read();
-        serInString[serInIndx] = sb;
-        serInIndx++;
-        serialConsole[i]->write(sb);
-        if (sb == '\n') {
-          cNum = i;
-          cli->parse(serInString);
-          serInIndx = 0;
-          memset(serInString, 0, sizeof(serInString));
-          serialConsole[i]->print("> ");
-        }
+  int sb;
+  if(serialConsole[0]->available()) {
+    while (serialConsole[0]->available()){
+      sb = serialConsole[0]->read();
+      serInString[serInIndx] = sb;
+      serInIndx++;
+      serialConsole[0]->write(sb);
+      if (sb == '\n') {
+        cNum = 0;
+        cli->parse(serInString);
+        serInIndx = 0;
+        memset(serInString, 0, sizeof(serInString));
+        serialConsole[0]->print("> ");
       }
     }
   }
@@ -289,7 +316,7 @@ void initCli () {
   };
   cli->addCmd(new Command("status", [](Cmd* cmd) { cliStatus(cNum); } ));
   cli->addCmd(new Command("help", [](Cmd* cmd) { cliHelp(cNum); } ));
-  cli->addCmd(new Command("debug", [](Cmd* cmd) { cliConfig(cNum); } ));
+  cli->addCmd(new Command("debug", [](Cmd* cmd) { cliDebug(cNum); } ));
   cli->addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
   cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
   cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
@@ -354,6 +381,303 @@ void initCli () {
   //cli->parse("hello");
 }
 #endif
+// ----------------------------------------------------------------------------- Wifi
+String wiConfig () {
+  String out;
+  out += "Config: ";
+  out += "Lora local address>";
+  out += cfg.loraAddress;
+  out += "<Lora frequency>";
+  out += cfg.loraFrequency;
+  out += "<Lora bandwidth>";
+  out += cfg.loraBandwidth;
+  out += "<Lora spreading factor>";
+  out += cfg.loraSpreadingFactor;
+  out += "<Lora coding rate 4>";
+  out += cfg.loraCodingRate4;
+  out += "<UAV timeout>";
+  out += cfg.uavTimeout;
+  out += "<MSP RX pin>";
+  out += cfg.mspRX;
+  out += "<MSP TX pin>";
+  out += cfg.mspTX;
+  out += "<Debug output>";
+  out += cfg.debugOutput;
+  out += "<Local fake planes>";
+  out += cfg.debugFakeWPs;
+  out += "<Radio fake planes>";
+  out += cfg.debugFakePlanes;
+  out += "<Move fake planes>";
+  out += cfg.debugFakeMoving;
+  return String(out);
+}
+void newWifiMsg (AsyncWebSocketClient * client, String msg) {
+  cliLog(getValue(msg, ' ', 0));
+  String arg0 = getValue(msg, ' ', 0);
+  String arg1 = getValue(msg, ' ', 1);
+
+
+  if (arg0 == "debug\n") {
+    cfg.debugOutput = !cfg.debugOutput;
+    saveConfig();
+    serialConsole[cNum]->println("CLI debugging: " + String(cfg.debugOutput));
+  }
+  if (arg0 == "localfakeplanes\n") {
+    cfg.debugFakeWPs = !cfg.debugFakeWPs;
+    saveConfig();
+    serialConsole[cNum]->println("Local fake planes: " + String(cfg.debugFakeWPs));
+  }
+  if (arg0 == "radiofakeplanes\n") {
+    cfg.debugFakePlanes = !cfg.debugFakePlanes;
+    saveConfig();
+    serialConsole[cNum]->println("Radio fake planes: " + String(cfg.debugFakePlanes));
+  }
+  if (arg0 == "movefakeplanes\n") {
+    cfg.debugFakeMoving = !cfg.debugFakeMoving;
+    saveConfig();
+    serialConsole[cNum]->println("Move fake planes: " + String(cfg.debugFakeMoving));
+  }
+  if (arg0 == "config") {
+    String arg2 = getValue(msg, ' ', 2);
+    if (arg1 == "loraFreq") {
+      if ( arg2.toInt() == 433E6 || arg2.toInt() == 868E6 || arg2.toInt() == 915E6) {
+        cfg.loraFrequency = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora frequency changed!");
+      } else {
+        serialConsole[cNum]->println("Lora frequency not correct: 433000000, 868000000, 915000000");
+      }
+    }
+    if (arg1 == "loraBandwidth") {
+      if (arg2.toInt() == 250000 || arg2.toInt() == 62500 || arg2.toInt() == 7800) {
+        cfg.loraBandwidth = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora bandwidth changed!");
+      } else {
+        serialConsole[cNum]->println("Lora bandwidth not correct: 250000, 62500, 7800");
+      }
+    }
+    if (arg1 == "loraSpread") {
+    if (arg2.toInt() >= 7 && arg2.toInt() <= 12) {
+        cfg.loraSpreadingFactor = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora spreading factor changed!");
+      } else {
+        serialConsole[cNum]->println("Lora Lora spreading factor not correct: 7 - 12");
+      }
+    }
+    if (arg1 == "loraAddress") {
+      if (arg2.toInt() >= 1 && arg2.toInt() <= 250) {
+        cfg.loraAddress = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora address changed!");
+      } else {
+        serialConsole[cNum]->println("Lora address not correct: 1 - 250");
+      }
+    }
+    if (arg1 == "uavtimeout") {
+      if (arg2.toInt() >= 5 && arg2.toInt() <= 600) {
+        cfg.uavTimeout = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("UAV timeout changed!");
+      } else {
+        serialConsole[cNum]->println("UAV timeout not correct: 5 - 600");
+      }
+    }
+  }
+}
+void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
+  if(type == WS_EVT_CONNECT){
+    Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
+    //client->printf("Status: %s, %s, %s, %s, %s", String(planeFC).c_str(), String(pd.planeName).c_str(), String(((float)fcanalog.vbat/10)).c_str(),String(pd.armState).c_str(),String(pd.gps.numSat).c_str());
+    client->ping();
+  } else if(type == WS_EVT_DISCONNECT){
+    Serial.printf("ws[%s][%u] disconnect: %u\n", server->url(), client->id());
+  } else if(type == WS_EVT_ERROR){
+    Serial.printf("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
+  } else if(type == WS_EVT_PONG){
+    Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
+  } else if(type == WS_EVT_DATA){
+    AwsFrameInfo * info = (AwsFrameInfo*)arg;
+    String msg = "";
+    if(info->final && info->index == 0 && info->len == len){
+      //the whole message is in a single frame and we got all of it's data
+      Serial.printf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
+
+      if(info->opcode == WS_TEXT){
+        for(size_t i=0; i < info->len; i++) {
+          msg += (char) data[i];
+        }
+      } else {
+        char buff[3];
+        for(size_t i=0; i < info->len; i++) {
+          sprintf(buff, "%02x ", (uint8_t) data[i]);
+          msg += buff ;
+        }
+      }
+      Serial.printf("%s\n",msg.c_str());
+
+      if(info->opcode == WS_TEXT)
+        newWifiMsg(client, msg);
+      else
+        client->binary("I got your binary message");
+    } else {
+      //message is comprised of multiple frames or the frame is split into multiple packets
+      if(info->index == 0){
+        if(info->num == 0)
+          Serial.printf("ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+        Serial.printf("ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
+      }
+
+      Serial.printf("ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
+
+      if(info->opcode == WS_TEXT){
+        for(size_t i=0; i < info->len; i++) {
+          msg += (char) data[i];
+        }
+      } else {
+        char buff[3];
+        for(size_t i=0; i < info->len; i++) {
+          sprintf(buff, "%02x ", (uint8_t) data[i]);
+          msg += buff ;
+        }
+      }
+      Serial.printf("%s\n",msg.c_str());
+
+      if((info->index + len) == info->len){
+        Serial.printf("ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
+        if(info->final){
+          Serial.printf("ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
+          if(info->message_opcode == WS_TEXT)
+            client->text("I got your text message");
+          else
+            client->binary("I got your binary message");
+        }
+      }
+    }
+  }
+}
+
+
+
+const char * hostName = "esp-async";
+const char* http_username = "admin";
+const char* http_password = "admin";
+
+void wifisetup(){
+
+  display.drawString (0, 32, "WIFI ");
+  display.display();
+  wifiManager.autoConnect("INAV-Radar");
+  display.drawString (100, 32, "OK");
+  display.display();
+  //wifiManager.startConfigPortal("INAV-Radar");
+
+  //Send OTA events to the browser
+  ArduinoOTA.onStart([]() { events.send("Update Start", "ota"); });
+  ArduinoOTA.onEnd([]() { events.send("Update End", "ota"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    char p[32];
+    sprintf(p, "Progress: %u%%\n", (progress/(total/100)));
+    events.send(p, "ota");
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    if(error == OTA_AUTH_ERROR) events.send("Auth Failed", "ota");
+    else if(error == OTA_BEGIN_ERROR) events.send("Begin Failed", "ota");
+    else if(error == OTA_CONNECT_ERROR) events.send("Connect Failed", "ota");
+    else if(error == OTA_RECEIVE_ERROR) events.send("Recieve Failed", "ota");
+    else if(error == OTA_END_ERROR) events.send("End Failed", "ota");
+  });
+  ArduinoOTA.setHostname(hostName);
+  ArduinoOTA.begin();
+
+  MDNS.addService("http","tcp",80);
+
+  SPIFFS.begin();
+
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
+
+  events.onConnect([](AsyncEventSourceClient *client){
+    //client->send("hello!",NULL,millis(),1000);
+    client->send(String("Status: " + String(planeFC)+ ", " +String(pd.planeName)+ ", " +String(((float)fcanalog.vbat/10))+ ", " +String(pd.armState)+ ", " +String(pd.gps.numSat)).c_str(),NULL,millis(),1000);
+
+    client->send(wiConfig().c_str(),NULL);
+  });
+  server.addHandler(&events);
+
+  server.addHandler(new SPIFFSEditor(SPIFFS, http_username,http_password));
+
+  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/plain", String(ESP.getFreeHeap()));
+  });
+
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.htm");
+
+  server.onNotFound([](AsyncWebServerRequest *request){
+    Serial.printf("NOT_FOUND: ");
+    if(request->method() == HTTP_GET)
+      Serial.printf("GET");
+    else if(request->method() == HTTP_POST)
+      Serial.printf("POST");
+    else if(request->method() == HTTP_DELETE)
+      Serial.printf("DELETE");
+    else if(request->method() == HTTP_PUT)
+      Serial.printf("PUT");
+    else if(request->method() == HTTP_PATCH)
+      Serial.printf("PATCH");
+    else if(request->method() == HTTP_HEAD)
+      Serial.printf("HEAD");
+    else if(request->method() == HTTP_OPTIONS)
+      Serial.printf("OPTIONS");
+    else
+      Serial.printf("UNKNOWN");
+    Serial.printf(" http://%s%s\n", request->host().c_str(), request->url().c_str());
+
+    if(request->contentLength()){
+      Serial.printf("_CONTENT_TYPE: %s\n", request->contentType().c_str());
+      Serial.printf("_CONTENT_LENGTH: %u\n", request->contentLength());
+    }
+
+    int headers = request->headers();
+    int i;
+    for(i=0;i<headers;i++){
+      AsyncWebHeader* h = request->getHeader(i);
+      Serial.printf("_HEADER[%s]: %s\n", h->name().c_str(), h->value().c_str());
+    }
+
+    int params = request->params();
+    for(i=0;i<params;i++){
+      AsyncWebParameter* p = request->getParam(i);
+      if(p->isFile()){
+        Serial.printf("_FILE[%s]: %s, size: %u\n", p->name().c_str(), p->value().c_str(), p->size());
+      } else if(p->isPost()){
+        Serial.printf("_POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
+      } else {
+        Serial.printf("_GET[%s]: %s\n", p->name().c_str(), p->value().c_str());
+      }
+    }
+
+    request->send(404);
+  });
+  server.onFileUpload([](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final){
+    if(!index)
+      Serial.printf("UploadStart: %s\n", filename.c_str());
+    Serial.printf("%s", (const char*)data);
+    if(final)
+      Serial.printf("UploadEnd: %s (%u)\n", filename.c_str(), index+len);
+  });
+  server.onRequestBody([](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+    if(!index)
+      Serial.printf("BodyStart: %u\n", total);
+    Serial.printf("%s", (const char*)data);
+    if(index + len == total)
+      Serial.printf("BodyEnd: %u\n", total);
+  });
+  server.begin();
+}
+
+
 // ----------------------------------------------------------------------------- LoRa
 void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
@@ -427,7 +751,7 @@ void sendFakePlanes () {
   fakepd.loraAddress = (char)3;
   String("Testplane #3").toCharArray(fakepd.planeName,20);
   fakepd.armState=  1;
-  fakepd.gps.lat = 50.100400 * 10000000;
+  fakepd.gps.lat = 50.101400 * 10000000;
   fakepd.gps.lon = 8.762835 * 10000000 + (341 * moving);
   sendMessage(&fakepd); /*
   delay(300);
@@ -549,7 +873,8 @@ void getPlaneBat () {
 }
 
 void getPlaneData () {
-  String("No FC").toCharArray(pd.planeName,20);
+  String("No Name").toCharArray(pd.planeName,20);
+  String("No FC").toCharArray(planeFC,20);
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
     //Serial.println(pd.planeName);
   }
@@ -705,18 +1030,14 @@ void setup() {
 
   Serial.begin(115200);
   serialConsole[0] = &Serial;
-  //SerialBT.begin(String(pd.planeName));
-  serialConsole[1] = &SerialBT;
-
   initCli();
-
   initConfig();
   initDisplay();
-
   initLora();
   delay(1500);
   initMSP();
   delay(1000);
+  wifisetup();
 
   for (size_t i = 0; i <= 4; i++) {
     pds[i].pd.loraAddress= 0x00;
@@ -724,10 +1045,10 @@ void setup() {
   }
   booted = 1;
   serialConsole[0]->print("> ");
-  serialConsole[1]->print("> ");
 }
 // ----------------------------------------------------------------------------- main loop
 void loop() {
+  ArduinoOTA.handle();
 
   if (millis() - displayLastTime > cfg.intervalDisplay) {
     #ifdef RADARESP32
@@ -757,26 +1078,22 @@ void loop() {
     }
     getPlaneData();
     dalternate = !dalternate;
-    if (String(pd.planeName) != "No FC" ) {
+    if (String(pd.planeName) != "No Name" ) {
       getPlanetArmed();
       getPlaneBat();
       if (!pd.armState) getPlaneGPS();
     }
 
     if (!pd.armState) {
+      if (!wifiON) {
+        wifiManager.autoConnect("INAV-Radar");
+        wifiON = !wifiON;
+      }
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);
       LoRa.receive();
       homepos = pd.gps;
 
-    }
-    if (pd.armState && bton) {
-      bton = 0;
-      SerialBT.end();
-    }
-    if (!pd.armState && !bton) {
-      bton = 1;
-      SerialBT.begin("INAV-" + String(pd.planeName));
     }
     pdLastTime = millis();
   }
@@ -785,6 +1102,10 @@ void loop() {
     sendLastTime = millis()+ random(0, 50);
 
     if (pd.armState) {
+      if (wifiON) {
+        WiFi.disconnect();
+        wifiON = !wifiON;
+      }
       getPlaneGPS();
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);
@@ -797,4 +1118,9 @@ void loop() {
     //planeFakeWPv2();
 
   }
+}
+
+void nosetup()
+{
+
 }
