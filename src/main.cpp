@@ -732,7 +732,7 @@ void sendFakePlanes () {
   fakepd.armState=  1;
 //  fakepd.gps.lat = homepos.lat + (10 * moving);
 //  fakepd.gps.lon = homepos.lon;
-  fakepd.gps.alt = 900;
+  fakepd.gps.alt = 300;
   fakepd.gps.groundSpeed = 50;
   //sendMessage(&fakepd);
   //delay(300);
@@ -742,17 +742,19 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 50.100400 * 10000000 + (500 * moving);
-  fakepd.gps.lon = 8.762835 * 10000000;
+  fakepd.gps.lat = 50.088250 * 10000000; // + (500 * moving);
+  fakepd.gps.lon = 8.783886 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
   // 50.100400, 8.762835
+  // 47.345446, -1.543392
   delay(300);
   fakepd.loraAddress = (char)3;
   String("Testplane #3").toCharArray(fakepd.planeName,20);
+  fakepd.gps.alt = 500;
   fakepd.armState=  1;
-  fakepd.gps.lat = 50.101400 * 10000000;
-  fakepd.gps.lon = 8.762835 * 10000000 + (341 * moving);
+  fakepd.gps.lat = 50.088233 * 10000000;
+  fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
   sendMessage(&fakepd); /*
   delay(300);
   fakepd.loraAddress = (char)4;
@@ -1019,6 +1021,9 @@ void initMSP () {
   #endif
 }
 
+
+
+
 // ----------------------------------------------------------------------------- main init
 void setup() {
 
@@ -1037,7 +1042,7 @@ void setup() {
   delay(1500);
   initMSP();
   delay(1000);
-  wifisetup();
+  //wifisetup();
 
   for (size_t i = 0; i <= 4; i++) {
     pds[i].pd.loraAddress= 0x00;
@@ -1046,6 +1051,17 @@ void setup() {
   booted = 1;
   serialConsole[0]->print("> ");
 }
+void noloop()
+{
+  int relativAlt=8;
+	//Calculate Height of waypoint angle=asin(h/d)
+	int distanceFromMe=9;
+
+  float anglePoiY=relativAlt/distanceFromMe;
+  delay(1000);
+  cliLog(String(anglePoiY));
+}
+
 // ----------------------------------------------------------------------------- main loop
 void loop() {
   ArduinoOTA.handle();
@@ -1085,10 +1101,7 @@ void loop() {
     }
 
     if (!pd.armState) {
-      if (!wifiON) {
-        wifiManager.autoConnect("INAV-Radar");
-        wifiON = !wifiON;
-      }
+
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);
       LoRa.receive();
@@ -1102,10 +1115,7 @@ void loop() {
     sendLastTime = millis()+ random(0, 50);
 
     if (pd.armState) {
-      if (wifiON) {
-        WiFi.disconnect();
-        wifiON = !wifiON;
-      }
+
       getPlaneGPS();
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);
@@ -1118,9 +1128,4 @@ void loop() {
     //planeFakeWPv2();
 
   }
-}
-
-void nosetup()
-{
-
 }
