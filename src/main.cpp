@@ -95,11 +95,11 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
-    cfg.intervalSend = 500; // in ms + random
+    cfg.intervalSend = 250; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 10; // in sec
@@ -742,12 +742,13 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 50.088250 * 10000000; // + (500 * moving);
-  fakepd.gps.lon = 8.783886 * 10000000;
+  fakepd.gps.lat = 47.345446 * 10000000; // + (500 * moving);
+  fakepd.gps.lon = -1.543392 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
   // 50.100400, 8.762835
   // 47.345446, -1.543392
+  /*
   delay(300);
   fakepd.loraAddress = (char)3;
   String("Testplane #3").toCharArray(fakepd.planeName,20);
@@ -755,7 +756,7 @@ void sendFakePlanes () {
   fakepd.armState=  1;
   fakepd.gps.lat = 50.088233 * 10000000;
   fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
-  sendMessage(&fakepd); /*
+  sendMessage(&fakepd);
   delay(300);
   fakepd.loraAddress = (char)4;
   String("Testplane #4").toCharArray(fakepd.planeName,20);
