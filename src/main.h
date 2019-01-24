@@ -54,3 +54,14 @@ const uint8_t inactiveSymbol[] PROGMEM = {
     B00000000,
     B00000000
 };
+
+const uint8_t warnSymbol[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00010000,
+    B00101000,
+    B00101000,
+    B01111100,
+    B01101100,
+    B11111110
+};

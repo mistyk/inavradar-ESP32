@@ -40,7 +40,7 @@ using namespace simplecli;
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 #endif
 
-#define CFGVER 8 // bump up to overwrite setting with new defaults
+#define CFGVER 9 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -63,6 +63,7 @@ long displayLastTime = 0;
 long pdLastTime = 0;
 
 msp_analog_t fcanalog;
+msp_status_ex_t fcstatusex;
 msp_raw_gps_t homepos; // set on arm
 planeData pd; // our uav data
 planeData pdIn; // new air packet
@@ -73,7 +74,8 @@ bool wifiON = 1;
 bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
 planeData loraMsg; // incoming packet
-
+int numPlanes = 0;
+String rssi = "0";
 #ifdef RADARESP32
 // ----------------------------------------------------------------------------- EEPROM / config
 void saveConfig () {
@@ -95,7 +97,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
@@ -691,6 +693,7 @@ void onReceive(int packetSize) {
   //cliLog(loraMsg.header);
   //cliLog(cfg.loraHeader);
   if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
+      rssi = String(LoRa.packetRssi());
       loraRX = 1;
       pdIn = loraMsg;
       cliLog("New air packet");
@@ -814,27 +817,67 @@ void initLora() {
 void drawDisplay () {
   display.clear();
   if (dalternate) {
+    display.setFont (ArialMT_Plain_24);
+    display.setTextAlignment (TEXT_ALIGN_RIGHT);
+    display.drawString (30,5, String(pd.gps.numSat));
+    display.drawString (30,30, String(numPlanes));
+    display.drawString (114,5, String((float)fcanalog.vbat/10));
+    display.drawString (114,30, rssi);
     display.setFont (ArialMT_Plain_10);
     display.setTextAlignment (TEXT_ALIGN_LEFT);
-    display.drawString (0,54, pd.armState ? "Armed" : "Disarmed");
-    display.drawString (48,54, String(pd.gps.numSat) + " Sat");
+    //if (pd.gps.fixType == 0) display.drawString (33,7, "NF");
+    if (pd.gps.fixType == 1) display.drawString (33,7, "2D");
+    if (pd.gps.fixType == 2) display.drawString (33,7, "3D");
+    display.drawString (33,16, "SAT");
+    display.drawString (33,42, "UAV");
+    display.drawString (116,16, "V");
+    display.drawString (116,42, "dB");
+    if (String(planeFC) == String("No FC")) {
+      if (cfg.debugOutput) {
+        if (cfg.debugFakeWPs) display.drawString (0,54, "LFP");
+        if (cfg.debugFakePlanes) display.drawString (30,54, "RFP");
+        if (cfg.debugFakeMoving) display.drawString (60,54, "MFP");
+      }
+    } else {
+      display.drawString (0,54, pd.planeName);
+      if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
+    }
     display.drawString (84,54, "TX");
     display.drawString (106,54, "RX");
-
     display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
     display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
 
+  } else {
+    display.setFont (ArialMT_Plain_24);
+    display.setTextAlignment (TEXT_ALIGN_CENTER);
+    display.drawString (64,32, String((float)fcanalog.vbat/10) + " V");
     for (size_t i = 0; i <=4 ; i++) {
       if (pds[i].waypointNumber != 0) {
         display.drawString (0,i*8, pds[i].pd.planeName);
         display.drawString (80,i*8,String(pds[i].distance));
       }
     }
-  } else {
-    display.setFont (ArialMT_Plain_24);
-    display.setTextAlignment (TEXT_ALIGN_CENTER);
-    display.drawString (64,32, String((float)fcanalog.vbat/10) + " V");
+
   }
+  /* old display
+  display.setFont (ArialMT_Plain_10);
+  display.setTextAlignment (TEXT_ALIGN_LEFT);
+  display.drawString (0,54, pd.armState ? "Armed" : "Disarmed");
+  display.drawString (48,54, String(pd.gps.numSat) + " Sat");
+  display.drawString (84,54, "TX");
+  display.drawString (106,54, "RX");
+
+  display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
+  display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
+
+  for (size_t i = 0; i <=4 ; i++) {
+    if (pds[i].waypointNumber != 0) {
+      display.drawString (0,i*8, pds[i].pd.planeName);
+      display.drawString (80,i*8,String(pds[i].distance));
+    }
+  }
+  */
+
   display.display();
 }
 
@@ -874,7 +917,11 @@ void getPlaneBat () {
     //cliLog(String(fcanalog.vbat));
   }
 }
-
+void getPlaneStatusEx () {
+  if (msp.request(MSP_STATUS_EX, &fcstatusex, sizeof(fcstatusex))) {
+    //cliLog(String(fcanalog.vbat));
+  }
+}
 void getPlaneData () {
   String("No Name").toCharArray(pd.planeName,20);
   String("No FC").toCharArray(planeFC,20);
@@ -1077,8 +1124,12 @@ void loop() {
     loraRX = 0;
     displayLastTime = millis();
   }
+
   if (millis() - pdLastTime > cfg.intervalStatus) {
+    numPlanes = 0;
+    rssi = "0";
     for (size_t i = 0; i <= 4; i++) {
+      if (pds[i].waypointNumber != 0) numPlanes++;
       if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
       if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
         //pds[i].pd.gps.lat = 0;
@@ -1094,7 +1145,7 @@ void loop() {
       }
     }
     getPlaneData();
-    dalternate = !dalternate;
+    //dalternate = !dalternate;
     if (String(pd.planeName) != "No Name" ) {
       getPlanetArmed();
       getPlaneBat();
@@ -1102,9 +1153,12 @@ void loop() {
     }
 
     if (!pd.armState) {
+      getPlaneStatusEx();
 
-      loraTX = 1;
-      if (pd.gps.fixType != 0) sendMessage(&pd);
+      if (pd.gps.fixType != 0) {
+        sendMessage(&pd);
+        loraTX = 1;
+      }
       LoRa.receive();
       homepos = pd.gps;
 
@@ -1122,7 +1176,10 @@ void loop() {
       if (pd.gps.fixType != 0) sendMessage(&pd);
       LoRa.receive();
     }
-    if (cfg.debugFakePlanes) sendFakePlanes();
+    if (cfg.debugFakePlanes) {
+      sendFakePlanes();
+      loraTX = 1;
+    }
     //if (pd.armState) planeSetWP();
     planeSetWP();
     if (cfg.debugFakeWPs) planeFakeWP();
