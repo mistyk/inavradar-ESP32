@@ -1,15 +1,12 @@
+#include <Arduino.h>
+#include <esp_system.h>
 #include <lib/MSP.h>
 #include <lib/LoRa.h>
-#include <Arduino.h>
+#include <SSD1306.h>
+#include <EEPROM.h>
 #include <SimpleCLI.h>
 using namespace simplecli;
 #include <main.h>
-
-#include <SSD1306.h>
-#include <esp_system.h>
-#include <EEPROM.h>
-#include <SPIFFS.h>
-#include <FS.h>
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -25,8 +22,7 @@ MSP msp;
 bool booted = 0;
 Stream *serialConsole[1];
 int cNum = 0;
-bool dalternate = 1;
-
+int displayPage = 0;
 SSD1306 display (0x3c, 4, 15);
 
 long sendLastTime = 0;
@@ -46,6 +42,9 @@ bool loraTX = 0; // display TX
 planeData loraMsg; // incoming packet
 int numPlanes = 0;
 String rssi = "0";
+bool buttonState = 1;
+bool buttonPressed = 0;
+long lastDebounceTime = 0;
 // ----------------------------------------------------------------------------- EEPROM / config
 void saveConfig () {
   for(size_t i = 0; i < sizeof(cfg); i++) {
@@ -66,7 +65,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
@@ -479,7 +478,7 @@ void initLora() {
 // ----------------------------------------------------------------------------- Display
 void drawDisplay () {
   display.clear();
-  if (dalternate) {
+  if (displayPage == 0) {
     display.setFont (ArialMT_Plain_24);
     display.setTextAlignment (TEXT_ALIGN_RIGHT);
     display.drawString (30,5, String(pd.gps.numSat));
@@ -510,18 +509,37 @@ void drawDisplay () {
     display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
     display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
 
-  } else {
-    display.setFont (ArialMT_Plain_24);
-    display.setTextAlignment (TEXT_ALIGN_CENTER);
-    display.drawString (64,32, String((float)fcanalog.vbat/10) + " V");
-    for (size_t i = 0; i <=4 ; i++) {
-      if (pds[i].waypointNumber != 0) {
-        display.drawString (0,i*8, pds[i].pd.planeName);
-        display.drawString (80,i*8,String(pds[i].distance));
+  }
+  if (displayPage == 1) {
+    if (numPlanes == 0) display.drawString (0,0, "no UAVs detected ...");
+    else {
+      display.setFont (ArialMT_Plain_10);
+      for (size_t i = 0; i <=2 ; i++) {
+        if (pds[i].waypointNumber != 0) {
+          display.setTextAlignment (TEXT_ALIGN_LEFT);
+          display.drawString (0,i*16, pds[i].pd.planeName);
+          display.drawString (0,8+i*16, "RSSI " + rssi);
+          display.setTextAlignment (TEXT_ALIGN_RIGHT);
+          display.drawString (128,i*16, String((float)pds[i].pd.gps.lat/10000000,6));
+          display.drawString (128,8+i*16, String((float)pds[i].pd.gps.lon/10000000,6));
+        }
       }
     }
-
   }
+  if (displayPage == 2) {
+    display.setFont (ArialMT_Plain_10);
+    for (size_t i = 0; i <=1 ; i++) {
+      if (pds[i].waypointNumber != 0) {
+        display.setTextAlignment (TEXT_ALIGN_LEFT);
+        display.drawString (0,i*16, pds[i+3].pd.planeName);
+        display.drawString (0,8+i*16, "RSSI " + rssi);
+        display.setTextAlignment (TEXT_ALIGN_RIGHT);
+        display.drawString (65,i*16, String((float)pds[i+3].pd.gps.lat/10000000,6));
+        display.drawString (65,8+i*16, String((float)pds[i+3].pd.gps.lon/10000000,6));
+      }
+    }
+  }
+
   /* old display
   display.setFont (ArialMT_Plain_10);
   display.setTextAlignment (TEXT_ALIGN_LEFT);
@@ -724,11 +742,27 @@ void initMSP () {
   display.drawString (100, 24, planeFC);
   display.display();
 }
-
-
-
-
 // ----------------------------------------------------------------------------- main init
+
+const byte interruptPin = 0;
+volatile int interruptCounter = 0;
+int numberOfInterrupts = 0;
+
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+void IRAM_ATTR handleInterrupt() {
+  portENTER_CRITICAL_ISR(&mux);
+  if (buttonPressed == 0) {
+    buttonPressed = 1;
+    if (displayPage >= 1) displayPage = 0;
+    else displayPage++;
+    //drawDisplay();
+    lastDebounceTime = millis();
+  }
+  portEXIT_CRITICAL_ISR(&mux);
+}
+
+
 void setup() {
 
 /*  cli.RegisterCmd("status",&cliStatus);
@@ -747,6 +781,9 @@ void setup() {
   initMSP();
   delay(1000);
   //wifisetup();
+  pinMode(interruptPin, INPUT);
+  buttonPressed = 0;
+  attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
   for (size_t i = 0; i <= 4; i++) {
     pds[i].pd.loraAddress= 0x00;
@@ -755,19 +792,12 @@ void setup() {
   booted = 1;
   serialConsole[0]->print("> ");
 }
-void noloop()
-{
-  int relativAlt=8;
-	//Calculate Height of waypoint angle=asin(h/d)
-	int distanceFromMe=9;
-
-  float anglePoiY=relativAlt/distanceFromMe;
-  delay(1000);
-  cliLog(String(anglePoiY));
-}
 
 // ----------------------------------------------------------------------------- main loop
 void loop() {
+
+  if ( (millis() - lastDebounceTime) > 150 && buttonPressed == 1) buttonPressed = 0;
+
   if (millis() - displayLastTime > cfg.intervalDisplay) {
     drawDisplay();
     readCli();
@@ -779,7 +809,6 @@ void loop() {
 
   if (millis() - pdLastTime > cfg.intervalStatus) {
     numPlanes = 0;
-    rssi = "0";
     for (size_t i = 0; i <= 4; i++) {
       if (pds[i].waypointNumber != 0) numPlanes++;
       if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
@@ -792,28 +821,30 @@ void loop() {
         planeSetWP();
         pds[i].waypointNumber = 0;
         pds[i].pd.loraAddress = 0;
+        rssi = "0";
         String("").toCharArray(pds[i].pd.planeName,20);
         cliLog("UAV DB delete POI #" + String(i+1));
       }
     }
-    getPlaneData();
+
     //dalternate = !dalternate;
     if (String(pd.planeName) != "No Name" ) {
+      getPlaneData();
       getPlanetArmed();
       getPlaneBat();
-      if (!pd.armState) getPlaneGPS();
+      if (!pd.armState) {
+        getPlaneGPS();
+        getPlaneStatusEx();
+      }
     }
 
     if (!pd.armState) {
-      getPlaneStatusEx();
-
       if (pd.gps.fixType != 0) {
+        homepos = pd.gps;
         sendMessage(&pd);
         loraTX = 1;
       }
       LoRa.receive();
-      homepos = pd.gps;
-
     }
     pdLastTime = millis();
   }
@@ -822,7 +853,6 @@ void loop() {
     sendLastTime = millis()+ random(0, 50);
 
     if (pd.armState) {
-
       getPlaneGPS();
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);
@@ -836,6 +866,5 @@ void loop() {
     planeSetWP();
     if (cfg.debugFakeWPs) planeFakeWP();
     //planeFakeWPv2();
-
   }
 }
