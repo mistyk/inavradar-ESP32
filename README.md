@@ -92,6 +92,8 @@ localfakeplanes                  makes the module send a fakeplanes to connected
 movefakeplanes                   moves the fakeplane
 ```
 
+Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key. 
+
 A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:
 - wire up +5V and GND
