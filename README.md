@@ -79,7 +79,18 @@ If only the bottom line with TX and RX is showing, something is not working corr
 
 There is also a Android app in the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) to control debugging modes like sending fake planes to FC or via radio. If your ESP is powered up you can pair it to your phone via Bluetooth. Also note that Bluetooth is disabled on arming.
 
-Via USB or Bluetooth serial you get a small CLI with debug output.
+Via USB serial you get a small CLI with debug output.
+
+Also there are some commands:
+
+```
+config                           shows current config
+config loraFreq 433000000        sets lora frequency
+debug                            toggle debug output
+radiofakeplanes                  makes the module send a fakeplane (somewhere in germany)
+localfakeplanes                  makes the module send a fakeplanes to connected FC
+movefakeplanes                   moves the fakeplane
+```
 
 A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:
