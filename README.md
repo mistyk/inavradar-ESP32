@@ -77,8 +77,6 @@ The output should look something like this:
 After the firmware is flashed on the devices you should see 'No FC' (or the name of the UAV) on the opposing display.
 If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
 
-There is also a Android app in the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) to control debugging modes like sending fake planes to FC or via radio. If your ESP is powered up you can pair it to your phone via Bluetooth. Also note that Bluetooth is disabled on arming.
-
 Via USB serial you get a small CLI with debug output.
 
 Also there are some commands:
@@ -92,7 +90,7 @@ localfakeplanes                  makes the module send a fakeplanes to connected
 movefakeplanes                   moves the fakeplane
 ```
 
-Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key. 
+Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key.
 
 A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:
