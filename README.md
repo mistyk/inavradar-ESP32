@@ -86,7 +86,7 @@ config                           shows current config
 config loraFreq 433000000        sets lora frequency
 debug                            toggle debug output
 radiofakeplanes                  makes the module send a fakeplane (somewhere in germany)
-localfakeplanes                  makes the module send a fakeplanes to connected FC
+localfakeplanes                  makes the module send a fakeplane to connected FC
 movefakeplanes                   moves the fakeplane
 ```
 
