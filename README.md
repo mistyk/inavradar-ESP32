@@ -53,7 +53,7 @@ MacOS:
 $ pip3 install esptool
 ```
 
-Download the air-to-air test firmware from the [testing folder](https://github.com/mistyk/inavradar-ESP32/tree/master/testing)
+Download the air-to-air test firmware from the [releases page](https://github.com/mistyk/inavradar-ESP32/releases)
 and extract it. Run this command to flash it onto your ESP32 Lora module (Windows and MacOS):
 
 You may change the --port to match your operating system. If you are using Windows check the [device manager](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/devManager.PNG).
@@ -92,7 +92,7 @@ movefakeplanes                   moves the fakeplane
 
 Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key.
 
-A [testing version](https://github.com/mistyk/inavradar-ESP32/tree/master/testing) of INAV needs to be installed on your FC.
+A [testing version](https://github.com/mistyk/inavradar-ESP32/releases) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:
 - wire up +5V and GND
 - TX from FC to ESP RX pin 17
