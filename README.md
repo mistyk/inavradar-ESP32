@@ -82,8 +82,13 @@ Via USB serial you get a small CLI with debug output.
 Also there are some commands:
 
 ```
+status                           show status
+reboot                           reboot EPS32
+gpspos                           show GPS data
 config                           shows current config
 config loraFreq 433000000        sets lora frequency
+config loraBandwidth 250000      set lora bandwidth
+config uavtimeout 10             timeout for switched of UAVs
 debug                            toggle debug output
 radiofakeplanes                  makes the module send a fakeplane (somewhere in germany)
 localfakeplanes                  makes the module send a fakeplane to connected FC
