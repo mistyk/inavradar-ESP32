@@ -86,9 +86,9 @@ status                           show status
 reboot                           reboot EPS32
 gpspos                           show GPS data
 config                           shows current config
-config loraFreq 433000000        sets lora frequency
-config loraBandwidth 250000      set lora bandwidth
-config uavtimeout 10             timeout for switched of UAVs
+config loraFreq 433000000        sets lora frequency (Hz)
+config loraBandwidth 250000      set lora bandwidth (Hz)
+config uavtimeout 10             timeout for switched off UAVs (sec)
 debug                            toggle debug output
 radiofakeplanes                  makes the module send a fakeplane (somewhere in germany)
 localfakeplanes                  makes the module send a fakeplane to connected FC
