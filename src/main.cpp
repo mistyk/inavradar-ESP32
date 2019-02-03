@@ -190,7 +190,7 @@ void cliStatus(int n) {
   serialConsole[n]->print((float)fcanalog.vbat/10);
   serialConsole[n]->println(" V");
   serialConsole[n]->print("Arm state:        ");
-  serialConsole[n]->println(pd.armState ? "ARMED" : "DISARMED");
+  serialConsole[n]->println(pd.state ? "ARMED" : "DISARMED");
   serialConsole[n]->print("GPS:              ");
   serialConsole[n]->println(String(pd.gps.numSat) + " Sats");
   serialConsole[n]->println("statusend");
@@ -363,7 +363,7 @@ void onReceive(int packetSize) {
   //cliLog(loraMsg.header);
   //cliLog(cfg.loraHeader);
   if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
-      rssi = String(LoRa.packetRssi());
+      //rssi = String(LoRa.packetRssi());
       loraRX = 1;
       pdIn = loraMsg;
       cliLog("New air packet");
@@ -372,7 +372,8 @@ void onReceive(int packetSize) {
       for (size_t i = 0; i <= 4; i++) {
         if (String(pds[i].pd.planeName) == String(pdIn.planeName) ) { // update plane
           pds[i].pd = pdIn;
-          pds[i].pd.armState = 1;
+          pds[i].rssi = LoRa.packetRssi();
+          pds[i].pd.state = 1;
           pds[i].waypointNumber = i+1;
           pds[i].lastUpdate = millis();
           found = 1;
@@ -384,7 +385,7 @@ void onReceive(int packetSize) {
       if (!found) { // if not there put it in free slot
           pds[free].waypointNumber = free+1;
           pds[free].pd = pdIn;
-          pds[free].pd.armState = 1;
+          pds[free].pd.state = 1;
           pds[free].lastUpdate = millis();
           cliLog("UAV DB new POI #" + String(free+1));
           free = 0;
@@ -402,11 +403,11 @@ void sendFakePlanes () {
   String("ADS-RC").toCharArray(fakepd.header,7);
   fakepd.loraAddress = (char)5;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1;
+  fakepd.state=  1;
 //  fakepd.gps.lat = homepos.lat + (10 * moving);
 //  fakepd.gps.lon = homepos.lon;
   fakepd.gps.alt = 300;
-  fakepd.gps.groundSpeed = 50;
+  fakepd.gps.groundSpeed = 450;
   //sendMessage(&fakepd);
   //delay(300);
   /*
@@ -415,8 +416,8 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 47.345446 * 10000000; // + (500 * moving);
-  fakepd.gps.lon = -1.543392 * 10000000;
+  fakepd.gps.lat = 50.100853 * 10000000; // + (500 * moving);
+  fakepd.gps.lon = 8.763960 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
   // 50.100400, 8.762835
@@ -501,7 +502,8 @@ void drawDisplay () {
         if (cfg.debugFakeMoving) display.drawString (60,54, "MFP");
       }
     } else {
-      display.drawString (0,54, pd.planeName);
+      if (bitRead(fcstatusex.armingFlags,17) == 0) display.drawString (0,54, "RC LINK LOST");
+      else display.drawString (0,54, pd.planeName);
       if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
     }
     display.drawString (84,54, "TX");
@@ -518,7 +520,7 @@ void drawDisplay () {
         if (pds[i].waypointNumber != 0) {
           display.setTextAlignment (TEXT_ALIGN_LEFT);
           display.drawString (0,i*16, pds[i].pd.planeName);
-          display.drawString (0,8+i*16, "RSSI " + rssi);
+          display.drawString (0,8+i*16, "RSSI " + String(pds[i].rssi));
           display.setTextAlignment (TEXT_ALIGN_RIGHT);
           display.drawString (128,i*16, String((float)pds[i].pd.gps.lat/10000000,6));
           display.drawString (128,8+i*16, String((float)pds[i].pd.gps.lon/10000000,6));
@@ -532,7 +534,7 @@ void drawDisplay () {
       if (pds[i].waypointNumber != 0) {
         display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawString (0,i*16, pds[i+3].pd.planeName);
-        display.drawString (0,8+i*16, "RSSI " + rssi);
+        display.drawString (0,8+i*16, "RSSI " + String(pds[i].rssi));
         display.setTextAlignment (TEXT_ALIGN_RIGHT);
         display.drawString (65,i*16, String((float)pds[i+3].pd.gps.lat/10000000,6));
         display.drawString (65,8+i*16, String((float)pds[i+3].pd.gps.lon/10000000,6));
@@ -584,7 +586,7 @@ void getPlanetArmed () {
   msp.getActiveModes(&planeModes);
   //Serial.print("Arm State: ");
   //Serial.println(bitRead(planeModes,0));
-  pd.armState = bitRead(planeModes,0);
+  pd.state = bitRead(planeModes,0);
 }
 
 void getPlaneGPS () {
@@ -599,6 +601,7 @@ void getPlaneBat () {
 }
 void getPlaneStatusEx () {
   if (msp.request(MSP_STATUS_EX, &fcstatusex, sizeof(fcstatusex))) {
+    cliLog(String(bitRead(fcstatusex.armingFlags,18)));
     //cliLog(String(fcanalog.vbat));
   }
 }
@@ -625,7 +628,7 @@ void planeSetWP () {
       wp.p1 = pds[i].pd.gps.groundSpeed;
       cliLog("P1:" + String(wp.p1));
       wp.p2 = 0;
-      wp.p3 = pds[i].pd.armState;
+      wp.p3 = pds[i].pd.state;
       cliLog("P3:" + String(wp.p3));
       if (i == 4 || pds[i+1].waypointNumber==0) {
         wp.flag = 0xa5;
@@ -816,7 +819,7 @@ void loop() {
         //pds[i].pd.gps.lat = 0;
         //pds[i].pd.gps.lon = 0;
         //pds[i].pd.gps.alt = 0;
-        pds[i].pd.armState = 2;
+        pds[i].pd.state = 2;
         planeSetWP();
         planeSetWP();
         pds[i].waypointNumber = 0;
@@ -826,19 +829,19 @@ void loop() {
         cliLog("UAV DB delete POI #" + String(i+1));
       }
     }
-
+    getPlaneStatusEx();
     //dalternate = !dalternate;
     if (String(pd.planeName) != "No Name" ) {
       getPlaneData();
       getPlanetArmed();
       getPlaneBat();
-      if (!pd.armState) {
+      if (!pd.state) {
         getPlaneGPS();
-        getPlaneStatusEx();
+
       }
     }
 
-    if (!pd.armState) {
+    if (!pd.state) {
       if (pd.gps.fixType != 0) {
         homepos = pd.gps;
         sendMessage(&pd);
@@ -852,7 +855,7 @@ void loop() {
   if ((millis() - sendLastTime) > cfg.intervalSend ) {
     sendLastTime = millis()+ random(0, 50);
 
-    if (pd.armState) {
+    if (pd.state) {
       getPlaneGPS();
       loraTX = 1;
       if (pd.gps.fixType != 0) sendMessage(&pd);

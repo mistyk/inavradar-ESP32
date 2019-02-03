@@ -24,13 +24,14 @@ struct planeData {
   char header[7];
   byte loraAddress;
   char planeName[20];
-  int16_t armState;
+  int16_t state;
   msp_raw_gps_t gps;
 };
 struct planesData {
   uint8_t waypointNumber;
   long lastUpdate;
   double distance;
+  double rssi;
   planeData pd;
 };
 const uint8_t activeSymbol[] PROGMEM = {
