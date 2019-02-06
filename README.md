@@ -23,12 +23,12 @@ Everything here is WORK IN PROGRESS!
 The software is based on two components:
 - ESP32 LoRa part is found in this repo.
 It's developed using [PlatformIO](https://platformio.org/) plugin for [Atom](https://atom.io/) editor.
-- INAV OSD part is found [here](https://github.com/mistyk/inavRC2).
+- INAV OSD part repo is found [here](https://github.com/mistyk/inavRC2).
 It's a fork from the INAV repo and instructions how to build can be found [here](https://github.com/iNavFlight/inav/blob/master/docs/development/Building%20in%20Docker.md).
 
-INAV-Radar is currently no part of the INAV flight control software. INAV can be found [here](https://github.com/iNavFlight/inav).
+INAV-Radar is a experimental firmware based on INAV and is currently no part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
 
-## Testing communication between ESP32 Lora modules and FCs
+## Testing
 For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
 
 Your system needs the driver for the USB UART bridge:
