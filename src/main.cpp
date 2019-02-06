@@ -15,7 +15,7 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 9 // bump up to overwrite setting with new defaults
+#define CFGVER 11 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -65,10 +65,10 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
-    cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
+    cfg.loraSpreadingFactor = 10; // 7 is shortest time on air - 12 is longest
     cfg.intervalSend = 250; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
@@ -76,7 +76,7 @@ void initConfig () {
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
     cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane) # TODO
-    cfg.debugOutput = true;
+    cfg.debugOutput = false;
     cfg.debugFakeWPs = false;
     cfg.debugFakePlanes = false;
     cfg.debugFakeMoving = false;
@@ -416,11 +416,12 @@ void sendFakePlanes () {
   fakepd.armState=  1; */
   // -------------------------------------------------------- fixed GPS pos radio fake planes
 
-  fakepd.gps.lat = 50.100853 * 10000000; // + (500 * moving);
-  fakepd.gps.lon = 8.763960 * 10000000;
+  fakepd.gps.lat = 50.100400 * 10000000; // + (500 * moving);
+  fakepd.gps.lon = 8.762835 * 10000000;
   sendMessage(&fakepd);
   // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
   // 50.100400, 8.762835
+  // 50.101938, 8.812962 - bieber
   // 47.345446, -1.543392
   /*
   delay(300);
@@ -502,8 +503,9 @@ void drawDisplay () {
         if (cfg.debugFakeMoving) display.drawString (60,54, "MFP");
       }
     } else {
-      if (bitRead(fcstatusex.armingFlags,17) == 0) display.drawString (0,54, "RC LINK LOST");
-      else display.drawString (0,54, pd.planeName);
+      //if (bitRead(fcstatusex.armingFlags,17) == 0) display.drawString (0,54, "RC LINK LOST");
+      //else
+      display.drawString (0,54, pd.planeName);
       if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
     }
     display.drawString (84,54, "TX");
