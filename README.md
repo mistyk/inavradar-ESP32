@@ -17,7 +17,7 @@ Other variants (e.g. Heltec) or without OLED display and different antenna conne
 
 Also please keep track of your countries regulations regarding radio transmissions.
 
-## Software
+## Development
 Everything here is WORK IN PROGRESS!
 
 The software is based on two components:
