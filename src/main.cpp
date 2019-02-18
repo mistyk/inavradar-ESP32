@@ -203,8 +203,8 @@ void cliHelp(int n) {
   serialConsole[n]->println("config loraSpread n     - Set SF (e.g. n = 10)");
   serialConsole[n]->println("config uavtimeout n     - Set UAV timeout in sec (e.g. n = 10)");
   serialConsole[n]->println("config fctimeout n      - Set FC timeout in sec (e.g. n = 5)");
-  serialConsole[n]->println("config debuglat n       - Set debug GPS lat * 10000000 (e.g. n = 501004900)");
-  serialConsole[n]->println("config debuglon n       - Set debug GPS lon * 10000000 (e.g. n = 87632280)");
+  serialConsole[n]->println("config debuglat n       - Set debug GPS lat (e.g. n = 50.1004900)");
+  serialConsole[n]->println("config debuglon n       - Set debug GPS lon (e.g. n = 8.7632280)");
   serialConsole[n]->println("reboot                  - Reset MCU and radio");
   serialConsole[n]->println("gpspos                  - Show last GPS position");
   //serialConsole[n]->println("fcpass                - start FC passthru mode");
@@ -230,7 +230,8 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.loraCodingRate4);
   serialConsole[n]->print("UAV timeout:           ");
   serialConsole[n]->print(cfg.uavTimeout);
-  serialConsole[n]->print("FC timeout:           ");
+  serialConsole[n]->println(" sec");
+  serialConsole[n]->print("FC timeout:            ");
   serialConsole[n]->print(cfg.fcTimeout);
   serialConsole[n]->println(" sec");
   serialConsole[n]->print("MSP RX pin:            ");
@@ -339,7 +340,7 @@ void initCli () {
         serialConsole[cNum]->println("Lora Lora spreading factor not correct: 7 - 12");
       }
     }
-    if (arg1 == "fctimeonut") {
+    if (arg1 == "fctimeout") {
       if (arg2.toInt() >= 1 && arg2.toInt() <= 250) {
         cfg.fcTimeout = arg2.toInt();
         saveConfig();
@@ -359,20 +360,22 @@ void initCli () {
     }
     if (arg1 == "debuglat") {
       if (arg2.toInt() >= 0) {
-        cfg.debugGpsLat = arg2.toInt();
+        float lat = arg2.toFloat() * 10000000;
+        cfg.debugGpsLat = (int32_t) lat;
         saveConfig();
         serialConsole[cNum]->println("Debug GPS lat changed!");
       } else {
-        serialConsole[cNum]->println("ebug GPS lat not correct: lat * 10000000");
+        serialConsole[cNum]->println("Debug GPS lat not correct: 50.088251");
       }
     }
     if (arg1 == "debuglon") {
       if (arg2.toInt() >= 0) {
-        cfg.debugGpsLat = arg2.toInt();
+        float lon = arg2.toFloat() * 10000000;
+        cfg.debugGpsLon = (int32_t) lon;
         saveConfig();
         serialConsole[cNum]->println("Debug GPS lon changed!");
       } else {
-        serialConsole[cNum]->println("ebug GPS lon not correct: lon * 10000000");
+        serialConsole[cNum]->println("Debug GPS lon not correct: 8.783871");
       }
     }
   });
