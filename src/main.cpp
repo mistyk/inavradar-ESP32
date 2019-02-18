@@ -15,7 +15,7 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 11 // bump up to overwrite setting with new defaults
+#define CFGVER 12 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -29,17 +29,17 @@ long sendLastTime = 0;
 long displayLastTime = 0;
 long pdLastTime = 0;
 
-msp_analog_t fcanalog;
-msp_status_ex_t fcstatusex;
+msp_analog_t fcanalog; // analog values from FC
+msp_status_ex_t fcstatusex; // extended status from FC
 msp_raw_gps_t homepos; // set on arm
 planeData pd; // our uav data
 planeData pdIn; // new air packet
+planeData loraMsg; // incoming packet
 planesData pds[5]; // uav db
-planeData fakepd; // debugging
+planeData fakepd; // debugging plane
 char planeFC[20]; // uav fc name
 bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
-planeData loraMsg; // incoming packet
 int numPlanes = 0;
 String rssi = "0";
 bool buttonState = 1;
@@ -73,6 +73,7 @@ void initConfig () {
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 10; // in sec
+    cfg.fcTimeout = 5; // in sec
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
     cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane) # TODO
@@ -80,6 +81,8 @@ void initConfig () {
     cfg.debugFakeWPs = false;
     cfg.debugFakePlanes = false;
     cfg.debugFakeMoving = false;
+    cfg.debugGpsLat = 50.100400 * 10000000;
+    cfg.debugGpsLon = 8.762835 * 10000000;
     EEPROM.begin(size * 2);
     for(size_t i = 0; i < size; i++) {
       char data = ((char *)&cfg)[i];
@@ -96,12 +99,10 @@ void initConfig () {
 #include <cmath>
 #define earthRadiusKm 6371.0
 
-// This function converts decimal degrees to radians
 double deg2rad(double deg) {
   return (deg * M_PI / 180);
 }
 
-//  This function converts radians to decimal degrees
 double rad2deg(double rad) {
   return (rad * 180 / M_PI);
 }
@@ -126,13 +127,10 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
   return 2.0 * earthRadiusKm * asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
 }
 // ----------------------------------------------------------------------------- String split
-
-String getValue(String data, char separator, int index)
-{
+String getValue(String data, char separator, int index) {
     int found = 0;
     int strIndex[] = { 0, -1 };
     int maxIndex = data.length() - 1;
-
     for (int i = 0; i <= maxIndex && found <= index; i++) {
         if (data.charAt(i) == separator || i == maxIndex) {
             found++;
@@ -197,21 +195,29 @@ void cliStatus(int n) {
 }
 void cliHelp(int n) {
   serialConsole[n]->println("================= Commands =================");
-  serialConsole[n]->println("status            - Show whats going on");
-  serialConsole[n]->println("help              - List all commands");
-  serialConsole[n]->println("config            - List all settings");
-  serialConsole[n]->println("reboot            - Reset MCU and radio");
-  serialConsole[n]->println("gpspos            - Show last GPS position");
-  //serialConsole[n]->println("fcpass            - start FC passthru mode");
-  serialConsole[n]->println("debug             - Toggle debug output");
-  serialConsole[n]->println("localfakeplanes   - Send fake planes to FC");
-  serialConsole[n]->println("radiofakeplanes   - Send fake planes via radio");
-  serialConsole[n]->println("movefakeplanes    - Move fake planes");
+  serialConsole[n]->println("status                  - Show whats going on");
+  serialConsole[n]->println("help                    - List all commands");
+  serialConsole[n]->println("config                  - List all settings");
+  serialConsole[n]->println("config loraFreq n       - Set frequency in Hz (e.g. n = 433000000)");
+  serialConsole[n]->println("config loraBandwidth n  - Set bandwidth in Hz (e.g. n = 250000)");
+  serialConsole[n]->println("config loraSpread n     - Set SF (e.g. n = 10)");
+  serialConsole[n]->println("config uavtimeout n     - Set UAV timeout in sec (e.g. n = 10)");
+  serialConsole[n]->println("config fctimeout n      - Set FC timeout in sec (e.g. n = 5)");
+  serialConsole[n]->println("config debuglat n       - Set debug GPS lat * 10000000 (e.g. n = 501004900)");
+  serialConsole[n]->println("config debuglon n       - Set debug GPS lon * 10000000 (e.g. n = 87632280)");
+  serialConsole[n]->println("reboot                  - Reset MCU and radio");
+  serialConsole[n]->println("gpspos                  - Show last GPS position");
+  //serialConsole[n]->println("fcpass                - start FC passthru mode");
+  serialConsole[n]->println("debug                   - Toggle debug output");
+  serialConsole[n]->println("localfakeplanes         - Send fake plane to FC");
+  serialConsole[n]->println("lfp                     - Send fake plane to FC");
+  serialConsole[n]->println("radiofakeplanes         - Send fake plane via radio");
+  serialConsole[n]->println("rfp                     - Send fake plane via radio");
+  serialConsole[n]->println("movefakeplanes          - Move fake plane");
+  serialConsole[n]->println("mfp                     - Move fake plane");
 }
 void cliConfig(int n) {
   serialConsole[n]->println("=============== Configuration ==============");
-  serialConsole[n]->print("Lora local address:    ");
-  serialConsole[n]->println(cfg.loraAddress);
   serialConsole[n]->print("Lora frequency:        ");
   serialConsole[n]->print(cfg.loraFrequency);
   serialConsole[n]->println(" Hz");
@@ -224,6 +230,8 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.loraCodingRate4);
   serialConsole[n]->print("UAV timeout:           ");
   serialConsole[n]->print(cfg.uavTimeout);
+  serialConsole[n]->print("FC timeout:           ");
+  serialConsole[n]->print(cfg.fcTimeout);
   serialConsole[n]->println(" sec");
   serialConsole[n]->print("MSP RX pin:            ");
   serialConsole[n]->println(cfg.mspRX);
@@ -231,6 +239,10 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.mspTX);
   serialConsole[n]->print("Debug output:          ");
   serialConsole[n]->println(cfg.debugOutput ? "ON" : "OFF");
+  serialConsole[n]->print("Debug GPS lat:         ");
+  serialConsole[n]->println(cfg.debugGpsLat);
+  serialConsole[n]->print("Debug GPS lat:         ");
+  serialConsole[n]->println(cfg.debugGpsLon);
   serialConsole[n]->print("Local fake planes:     ");
   serialConsole[n]->println(cfg.debugFakeWPs ? "ON" : "OFF");
   serialConsole[n]->print("Radio fake planes:     ");
@@ -290,6 +302,9 @@ void initCli () {
   cli->addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
   cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
   cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
+  cli->addCmd(new Command("lfp", [](Cmd* cmd) { cliLocalFake(cNum); } ));
+  cli->addCmd(new Command("rfp", [](Cmd* cmd) { cliRadioFake(cNum); } ));
+  cli->addCmd(new Command("mfp", [](Cmd* cmd) { cliMoveFake(cNum); } ));
   cli->addCmd(new Command("reboot", [](Cmd* cmd) { cliReboot(cNum); } ));
   cli->addCmd(new Command("gpspos", [](Cmd* cmd) { cliGPSpos(cNum); } ));
 
@@ -324,13 +339,13 @@ void initCli () {
         serialConsole[cNum]->println("Lora Lora spreading factor not correct: 7 - 12");
       }
     }
-    if (arg1 == "loraAddress") {
+    if (arg1 == "fctimeonut") {
       if (arg2.toInt() >= 1 && arg2.toInt() <= 250) {
-        cfg.loraAddress = arg2.toInt();
+        cfg.fcTimeout = arg2.toInt();
         saveConfig();
-        serialConsole[cNum]->println("Lora address changed!");
+        serialConsole[cNum]->println("FC timout changed!");
       } else {
-        serialConsole[cNum]->println("Lora address not correct: 1 - 250");
+        serialConsole[cNum]->println("FC timout not correct: 1 - 250");
       }
     }
     if (arg1 == "uavtimeout") {
@@ -340,6 +355,24 @@ void initCli () {
         serialConsole[cNum]->println("UAV timeout changed!");
       } else {
         serialConsole[cNum]->println("UAV timeout not correct: 5 - 600");
+      }
+    }
+    if (arg1 == "debuglat") {
+      if (arg2.toInt() >= 0) {
+        cfg.debugGpsLat = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Debug GPS lat changed!");
+      } else {
+        serialConsole[cNum]->println("ebug GPS lat not correct: lat * 10000000");
+      }
+    }
+    if (arg1 == "debuglon") {
+      if (arg2.toInt() >= 0) {
+        cfg.debugGpsLat = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Debug GPS lon changed!");
+      } else {
+        serialConsole[cNum]->println("ebug GPS lon not correct: lon * 10000000");
       }
     }
   });
@@ -404,51 +437,11 @@ void sendFakePlanes () {
   fakepd.loraAddress = (char)5;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
   fakepd.state=  1;
-//  fakepd.gps.lat = homepos.lat + (10 * moving);
-//  fakepd.gps.lon = homepos.lon;
   fakepd.gps.alt = 300;
   fakepd.gps.groundSpeed = 450;
-  //sendMessage(&fakepd);
-  //delay(300);
-  /*
-  fakepd.loraAddress = (char)2;
-  String("Testplane #2").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1; */
-  // -------------------------------------------------------- fixed GPS pos radio fake planes
-
-  fakepd.gps.lat = 50.100400 * 10000000; // + (500 * moving);
-  fakepd.gps.lon = 8.762835 * 10000000;
+  fakepd.gps.lat = cfg.debugGpsLat + (500 * moving);
+  fakepd.gps.lon = cfg.debugGpsLon;
   sendMessage(&fakepd);
-  // 50.088233, 8.782278 ... 50.088233, 8.785693 ... 341 * 100
-  // 50.100400, 8.762835
-  // 50.101938, 8.812962 - bieber
-  // 47.345446, -1.543392
-  /*
-  delay(300);
-  fakepd.loraAddress = (char)3;
-  String("Testplane #3").toCharArray(fakepd.planeName,20);
-  fakepd.gps.alt = 500;
-  fakepd.armState=  1;
-  fakepd.gps.lat = 50.088233 * 10000000;
-  fakepd.gps.lon = 8.782278 * 10000000 + (341 * moving);
-  sendMessage(&fakepd);
-  delay(300);
-  fakepd.loraAddress = (char)4;
-  String("Testplane #4").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1;
-  fakepd.gps.lat = 50.088233 * 10000000;
-  fakepd.gps.lon = 8.782278 * 10000000 + (600 * moving);
-  fakepd.gps.alt = 500;
-  sendMessage(&fakepd);
-  delay(300);
-  fakepd.loraAddress = (char)5;
-  String("Testplane #5").toCharArray(fakepd.planeName,20);
-  fakepd.armState=  1;
-  fakepd.gps.lat = 50.1006770 * 10000000 + (1000 * moving);
-  fakepd.gps.lon = 8.762406 * 10000000;
-  sendMessage(&fakepd);
-  delay(300);
-*/
   cliLog("Fake UAVs sent.");
   moving++;
 }
@@ -505,6 +498,7 @@ void drawDisplay () {
     } else {
       //if (bitRead(fcstatusex.armingFlags,17) == 0) display.drawString (0,54, "RC LINK LOST");
       //else
+      // TODO
       display.drawString (0,54, pd.planeName);
       if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
     }
@@ -512,7 +506,6 @@ void drawDisplay () {
     display.drawString (106,54, "RX");
     display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
     display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
-
   }
   if (displayPage == 1) {
     if (numPlanes == 0) display.drawString (0,0, "no UAVs detected ...");
@@ -543,26 +536,6 @@ void drawDisplay () {
       }
     }
   }
-
-  /* old display
-  display.setFont (ArialMT_Plain_10);
-  display.setTextAlignment (TEXT_ALIGN_LEFT);
-  display.drawString (0,54, pd.armState ? "Armed" : "Disarmed");
-  display.drawString (48,54, String(pd.gps.numSat) + " Sat");
-  display.drawString (84,54, "TX");
-  display.drawString (106,54, "RX");
-
-  display.drawXbm(98, 55, 8, 8, loraTX ? activeSymbol : inactiveSymbol);
-  display.drawXbm(120, 55, 8, 8, loraRX ? activeSymbol : inactiveSymbol);
-
-  for (size_t i = 0; i <=4 ; i++) {
-    if (pds[i].waypointNumber != 0) {
-      display.drawString (0,i*8, pds[i].pd.planeName);
-      display.drawString (80,i*8,String(pds[i].distance));
-    }
-  }
-  */
-
   display.display();
 }
 
@@ -664,50 +637,10 @@ void planeFakeWP () {
     msp_set_wp_t wp;
     if (cfg.debugFakeMoving && moving > 100) {
       moving = 0;
-    } else {
+    }
+    if (!cfg.debugFakeMoving) {
       moving = 0;
     }
-/*    wp.waypointNumber = 1;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 50.1006770 * 10000000;
-    wp.lon = 8.7613380 * 10000000;
-    wp.alt = 100;
-    wp.p1 = 200;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-    wp.waypointNumber = 2;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 50.1020320 * 10000000;
-    wp.lon = 8.7615830 * 10000000;
-    wp.alt = 200;
-    wp.p1 = 100;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-    wp.waypointNumber = 3;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 50.102137 * 10000000;
-    wp.lon = 8.762990 * 10000000;
-    wp.alt = 300;
-    wp.p1 = 0;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-    wp.waypointNumber = 4;
-    wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-    wp.lat = 50.100547 * 10000000;
-    wp.lon = 8.764052 * 10000000;
-    wp.alt = 0;
-    wp.p1 = 500;
-    wp.p2 = 0;
-    wp.p3 = 0;
-    wp.flag = 0;
-    msp.command(MSP_SET_WP, &wp, sizeof(wp));
-*/
 
     if (pd.gps.fixType > 0) {
       wp.waypointNumber = 1;
@@ -739,7 +672,7 @@ void initMSP () {
   display.drawString (0, 24, "FC ");
   display.display();
   cliLog("Waiting for FC to start ...");
-  delay(2000);
+  delay(cfg.fcTimeout*1000);
   getPlaneData();
   //getPlanetArmed();
   getPlaneGPS();
@@ -769,13 +702,6 @@ void IRAM_ATTR handleInterrupt() {
 
 
 void setup() {
-
-/*  cli.RegisterCmd("status",&cliStatus);
-  cli.RegisterCmd("help",&cliHelp);
-  cli.RegisterCmd("config",&cliConfig);
-  cli.RegisterCmd("debug",&cliDebug);
-  cli.RegisterCmd("reboot",&cliReboot); */
-
   Serial.begin(115200);
   serialConsole[0] = &Serial;
   initCli();
@@ -785,7 +711,6 @@ void setup() {
   delay(1500);
   initMSP();
   delay(1000);
-  //wifisetup();
   pinMode(interruptPin, INPUT);
   buttonPressed = 0;
   attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
@@ -800,7 +725,6 @@ void setup() {
 
 // ----------------------------------------------------------------------------- main loop
 void loop() {
-
   if ( (millis() - lastDebounceTime) > 150 && buttonPressed == 1) buttonPressed = 0;
 
   if (millis() - displayLastTime > cfg.intervalDisplay) {
@@ -818,9 +742,6 @@ void loop() {
       if (pds[i].waypointNumber != 0) numPlanes++;
       if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
       if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
-        //pds[i].pd.gps.lat = 0;
-        //pds[i].pd.gps.lon = 0;
-        //pds[i].pd.gps.alt = 0;
         pds[i].pd.state = 2;
         planeSetWP();
         planeSetWP();
@@ -832,14 +753,12 @@ void loop() {
       }
     }
     getPlaneStatusEx();
-    //dalternate = !dalternate;
     if (String(pd.planeName) != "No Name" ) {
       getPlaneData();
       getPlanetArmed();
       getPlaneBat();
       if (!pd.state) {
         getPlaneGPS();
-
       }
     }
 
@@ -870,6 +789,5 @@ void loop() {
     //if (pd.armState) planeSetWP();
     planeSetWP();
     if (cfg.debugFakeWPs) planeFakeWP();
-    //planeFakeWPv2();
   }
 }

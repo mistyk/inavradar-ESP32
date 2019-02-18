@@ -4,6 +4,8 @@
 
 INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flight control software, it relays information about UAVs in the area to the flight controller for display on the OSD. INAV-Radar does this by using [LoRa](https://en.wikipedia.org/wiki/LoRa) radio to broadcast position, altitude, speed and plane name. It also listens for other UAVs so INAV OSD  can display this information as a radar style map.
 
+![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
+
 ## Hardware
 Current development is done using these cheap ESP32 LoRa modules.
 
@@ -82,17 +84,26 @@ Via USB serial you get a small CLI with debug output.
 Also there are some commands:
 
 ```
-status                           show status
-reboot                           reboot EPS32
-gpspos                           show GPS data
-config                           shows current config
-config loraFreq 433000000        sets lora frequency (Hz)
-config loraBandwidth 250000      set lora bandwidth (Hz)
-config uavtimeout 10             timeout for switched off UAVs (sec)
-debug                            toggle debug output
-radiofakeplanes                  makes the module send a fakeplane (somewhere in germany)
-localfakeplanes                  makes the module send a fakeplane to connected FC
-movefakeplanes                   moves the fakeplane
+================= Commands =================
+status                  - Show whats going on
+help                    - List all commands
+config                  - List all settings
+config loraFreq n       - Set frequency in Hz (e.g. n = 433000000)
+config loraBandwidth n  - Set bandwidth in Hz (e.g. n = 250000)
+config loraSpread n     - Set SF (e.g. n = 10)
+config uavtimeout n     - Set UAV timeout in sec (e.g. n = 10)
+config fctimeout n      - Set FC timeout in sec (e.g. n = 5)
+config debuglat n       - Set debug GPS lat * 10000000 (e.g. n = 501004900)
+config debuglon n       - Set debug GPS lon * 10000000 (e.g. n = 87632280)
+reboot                  - Reset MCU and radio
+gpspos                  - Show last GPS position
+debug                   - Toggle debug output
+localfakeplanes         - Send fake plane to FC
+lfp                     - Send fake plane to FC
+radiofakeplanes         - Send fake plane via radio
+rfp                     - Send fake plane via radio
+movefakeplanes          - Move fake plane
+mfp                     - Move fake plane
 ```
 
 Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key.

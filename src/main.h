@@ -10,14 +10,16 @@ struct config {
   uint16_t intervalDisplay; // in ms
   uint16_t intervalStatus; // in ms
   uint16_t uavTimeout; // in sec
+  uint8_t fcTimeout; // in sec
   uint8_t mspTX; // pin for msp serial TX
   uint8_t mspRX; // pin for msp serial RX
   uint8_t mspPOI; // POI type: 1 (Wayponit), 2 (Plane)
-
   bool debugOutput;
   bool debugFakeWPs;
   bool debugFakePlanes;
   bool debugFakeMoving;
+  int32_t debugGpsLat; // decimal degrees lat * 10000000
+  int32_t debugGpsLon; // decimal degrees lon * 10000000
 };
 
 struct planeData {
