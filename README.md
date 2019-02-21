@@ -106,7 +106,7 @@ movefakeplanes          - Move fake plane
 mfp                     - Move fake plane
 ```
 
-Attention !!! On Windows with Putty you must use [CRTL]-[J] insted of the [ENTER] key.
+Attention !!! On Windows with Putty you must use [CRTL]-[J] instead of the [ENTER] key.
 
 A [testing version](https://github.com/mistyk/inavradar-ESP32/releases) of INAV needs to be installed on your FC.
 To connect the ESP32 to the FC:

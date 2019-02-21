@@ -15,7 +15,7 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 12 // bump up to overwrite setting with new defaults
+#define CFGVER 13 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -72,7 +72,7 @@ void initConfig () {
     cfg.intervalSend = 250; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
-    cfg.uavTimeout = 10; // in sec
+    cfg.uavTimeout = 8; // in sec
     cfg.fcTimeout = 5; // in sec
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
