@@ -114,6 +114,8 @@ To connect the ESP32 to the FC:
 - TX from FC to ESP RX pin 17
 - RX from FC to ESP TX pin 23
 
+Just activate MSP con the corrosponding UART, the speed is 115200.
+
 Thanks for testing! 😄 👍
 
 ## Contact
