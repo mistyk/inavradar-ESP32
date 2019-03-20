@@ -15,7 +15,7 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 13 // bump up to overwrite setting with new defaults
+#define CFGVER 14 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -68,7 +68,7 @@ void initConfig () {
     cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
-    cfg.loraSpreadingFactor = 10; // 7 is shortest time on air - 12 is longest
+    cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
     cfg.intervalSend = 250; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
