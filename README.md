@@ -4,9 +4,17 @@
 
 INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flight control software, it relays information about UAVs in the area to the flight controller for display on the OSD. INAV-Radar does this by using [LoRa](https://en.wikipedia.org/wiki/LoRa) radio to broadcast position, altitude, speed and plane name. It also listens for other UAVs so INAV OSD  can display this information as a radar style map.
 
-![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
+![OSD](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
+
+## Index
+[Hardware](#hardware)
+[Development](#development)
+[Testing](#testing)
+[ESP32 Commands](#commands)
+[Contact](#contact)
 
 ## Hardware
+(#hardware)
 Current development is done using these cheap ESP32 LoRa modules.
 
 There are different variants for 433MHz and 868/915MHz:
@@ -20,6 +28,7 @@ Other variants (e.g. Heltec) or without OLED display and different antenna conne
 Also please keep track of your countries regulations regarding radio transmissions.
 
 ## Development
+(#development)
 Everything here is WORK IN PROGRESS!
 
 The software is based on two components:
@@ -31,6 +40,7 @@ It's a fork from the INAV repo and instructions how to build can be found [here]
 INAV-Radar is a experimental firmware based on INAV and is currently no part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
 
 ## Testing
+(#testing)
 For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
 
 Your system needs the driver for the USB UART bridge:
@@ -76,6 +86,7 @@ $ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x10
 The output should look something like this:
 ![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
 
+(#commands)
 After the firmware is flashed on the devices you should see 'No FC' (or the name of the UAV) on the opposing display.
 If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
 
@@ -119,6 +130,7 @@ Just activate MSP con the corrosponding UART, the speed is 115200.
 Thanks for testing! 😄 👍
 
 ## Contact
+(#contact)
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
 
 [Patreon](https://www.patreon.com/inavradar)
