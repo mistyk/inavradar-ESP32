@@ -7,11 +7,11 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 ![OSD](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
 
 ## Index
-[Hardware](#hardware)
-[Development](#development)
-[Testing](#testing)
-[ESP32 Commands](#commands)
-[Contact](#contact)
+-[Hardware](#hardware)
+-[Development](#development)
+-[Testing](#testing)
+-[ESP32 Commands](#commands)
+-[Contact](#contact)
 
 ## Hardware
 (#hardware)
