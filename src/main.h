@@ -24,7 +24,7 @@ struct config {
 
 struct planeData {
   char header[7];
-  byte loraAddress;
+  uint8_t seqNum;
   char planeName[20];
   int16_t state;
   msp_raw_gps_t gps;

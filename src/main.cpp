@@ -15,7 +15,7 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 14 // bump up to overwrite setting with new defaults
+#define CFGVER 15 // bump up to overwrite setting with new defaults
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -64,12 +64,12 @@ void initConfig () {
   if (cfg.configVersion != CFGVER) { // write default config
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
-    cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
+    //cfg.loraAddress = 2; // local lora address
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
-    cfg.intervalSend = 250; // in ms + random
+    cfg.intervalSend = 500; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
@@ -387,6 +387,7 @@ void initCli () {
   //cli->parse("hello");
 }
 // ----------------------------------------------------------------------------- LoRa
+uint8_t loraSeqNum = 0;
 void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
   LoRa.write((uint8_t*)outgoing, sizeof(fakepd));
@@ -437,13 +438,13 @@ void sendFakePlanes () {
   }
   cliLog("Sending fake UAVs via radio ...");
   String("ADS-RC").toCharArray(fakepd.header,7);
-  fakepd.loraAddress = (char)5;
+  //fakepd.loraAddress = (char)5;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
   fakepd.state=  1;
   fakepd.gps.alt = 300;
   fakepd.gps.groundSpeed = 450;
-  fakepd.gps.lat = cfg.debugGpsLat + (500 * moving);
-  fakepd.gps.lon = cfg.debugGpsLon;
+  fakepd.gps.lat = cfg.debugGpsLat; // + (250 * moving);
+  fakepd.gps.lon = cfg.debugGpsLon + (250 * moving);
   sendMessage(&fakepd);
   cliLog("Fake UAVs sent.");
   moving++;
@@ -452,7 +453,7 @@ void initLora() {
 	display.drawString (0, 8, "LORA");
   display.display();
   cliLog("Starting radio ...");
-  pd.loraAddress = cfg.loraAddress;
+  //pd.loraAddress = cfg.loraAddress;
   String(cfg.loraHeader).toCharArray(pd.header,7);
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
@@ -503,7 +504,7 @@ void drawDisplay () {
       //else
       // TODO
       display.drawString (0,54, pd.planeName);
-      if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
+      //if (fcstatusex.armingFlags != 0) display.drawXbm(61, 54, 8, 8, warnSymbol);
     }
     display.drawString (84,54, "TX");
     display.drawString (106,54, "RX");
@@ -593,7 +594,6 @@ void getPlaneData () {
     //Serial.println(planeFC);
   }
 }
-
 void planeSetWP () {
   msp_set_wp_t wp;
   for (size_t i = 0; i <= 4; i++) {
@@ -605,7 +605,7 @@ void planeSetWP () {
       wp.alt = pds[i].pd.gps.alt;
       wp.p1 = pds[i].pd.gps.groundSpeed;
       cliLog("P1:" + String(wp.p1));
-      wp.p2 = 0;
+      wp.p2 = pds[i].pd.seqNum;
       wp.p3 = pds[i].pd.state;
       cliLog("P3:" + String(wp.p3));
       if (i == 4 || pds[i+1].waypointNumber==0) {
@@ -667,7 +667,7 @@ void initMSP () {
   display.drawString (0, 16, "MSP ");
   display.display();
   delay(200);
-  Serial1.begin(115200, SERIAL_8N1, cfg.mspRX , cfg.mspTX);
+  Serial1.begin(57600, SERIAL_8N1, cfg.mspRX , cfg.mspTX);
   msp.begin(Serial1);
   cliLog("MSP started!");
   display.drawString (100, 16, "OK");
@@ -719,7 +719,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
   for (size_t i = 0; i <= 4; i++) {
-    pds[i].pd.loraAddress= 0x00;
+    //pds[i].pd.loraAddress= 0x00;
     pds[i].waypointNumber = 0;
   }
   booted = 1;
@@ -743,54 +743,57 @@ void loop() {
     numPlanes = 0;
     for (size_t i = 0; i <= 4; i++) {
       if (pds[i].waypointNumber != 0) numPlanes++;
-      if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
-      if (pds[i].pd.loraAddress != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
+      //if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
+      if (pds[i].waypointNumber != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
         pds[i].pd.state = 2;
         planeSetWP();
         planeSetWP();
         pds[i].waypointNumber = 0;
-        pds[i].pd.loraAddress = 0;
+        //pds[i].pd.loraAddress = 0;
         rssi = "0";
         String("").toCharArray(pds[i].pd.planeName,20);
         cliLog("UAV DB delete POI #" + String(i+1));
       }
     }
-    getPlaneStatusEx();
+    //getPlaneStatusEx();
     if (String(pd.planeName) != "No Name" ) {
       getPlaneData();
       getPlanetArmed();
       getPlaneBat();
       if (!pd.state) {
         getPlaneGPS();
+        if (pd.gps.fixType != 0) {
+          homepos = pd.gps;
+          sendMessage(&pd);
+          loraTX = 1;
+        }
+        LoRa.receive();
       }
-    }
-
-    if (!pd.state) {
-      if (pd.gps.fixType != 0) {
-        homepos = pd.gps;
-        sendMessage(&pd);
-        loraTX = 1;
-      }
-      LoRa.receive();
     }
     pdLastTime = millis();
   }
 
   if ((millis() - sendLastTime) > cfg.intervalSend ) {
     sendLastTime = millis()+ random(0, 50);
-
-    if (pd.state) {
-      getPlaneGPS();
-      loraTX = 1;
-      if (pd.gps.fixType != 0) sendMessage(&pd);
-      LoRa.receive();
+    if (String(pd.planeName) != "No Name" ) {
+      if (pd.state) {
+        getPlaneGPS();
+        loraTX = 1;
+        if (pd.gps.fixType != 0) {
+          if (loraSeqNum < 255) loraSeqNum++;
+          else loraSeqNum = 0;
+          pd.seqNum = loraSeqNum;
+          sendMessage(&pd);
+          LoRa.receive();
+        }
+      }
+      //if (pd.armState) planeSetWP();
+      planeSetWP();
+      if (cfg.debugFakeWPs) planeFakeWP();
     }
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
       loraTX = 1;
     }
-    //if (pd.armState) planeSetWP();
-    planeSetWP();
-    if (cfg.debugFakeWPs) planeFakeWP();
   }
 }
