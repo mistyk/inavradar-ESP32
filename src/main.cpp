@@ -600,30 +600,29 @@ void getPlaneData () {
   }
 }
 void planeSetWP () {
-  msp_set_wp_t wp;
+  msp_radar_pos_t radarPos;
   for (size_t i = 0; i <= 4; i++) {
     if (pds[i].waypointNumber != 0) {
-      wp.waypointNumber = pds[i].waypointNumber;
-      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-      wp.lat = pds[i].pd.gps.lat;
-      wp.lon = pds[i].pd.gps.lon;
-      wp.alt = pds[i].pd.gps.alt;
-      wp.p1 = pds[i].pd.gps.groundSpeed;
-      cliLog("P1:" + String(wp.p1));
-      wp.p2 = pds[i].pd.seqNum;
-      wp.p3 = pds[i].pd.state;
-      cliLog("P3:" + String(wp.p3));
-      if (i == 4 || pds[i+1].waypointNumber==0) {
-        wp.flag = 0xa5;
-        cliLog("last flag - POI #" + String(wp.waypointNumber));
-      }
-      else wp.flag = 0;
-      msp.command(MSP_SET_WP, &wp, sizeof(wp));
-      cliLog("Sent to FC - POI #" + String(wp.waypointNumber));
+//      wp.waypointNumber = pds[i].waypointNumber;
+//      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
+      radarPos.id = i;
+      radarPos.state = pds[i].pd.state;
+      radarPos.lat = pds[i].pd.gps.lat;
+      radarPos.lon = pds[i].pd.gps.lon;
+      radarPos.alt = pds[i].pd.gps.alt;
+      radarPos.heading = 0;
+      radarPos.speed = pds[i].pd.gps.groundSpeed;
+      radarPos.seqNum = pds[i].pd.seqNum;
+      radarPos.callsign0 = pds[i].pd.planeName[0];
+      radarPos.callsign1 = pds[i].pd.planeName[1];
+      radarPos.callsign2 = pds[i].pd.planeName[2];
+      msp.command(MSP_SET_RADAR_POS, &radarPos, sizeof(radarPos));
+      cliLog("Sent to FC - POI #" + String(i));
     }
   }
 }
 void planeFakeWPv2 () {
+  /*
   msp_raw_planes_t wp;
   wp.id = 1;
   wp.arm_state = 1;
@@ -636,6 +635,7 @@ void planeFakeWPv2 () {
   wp.callsign1 = 'A';
   wp.callsign2 = 'N';
   msp.commandv2(MSP2_ESP32, &wp, sizeof(wp));
+  */
 }
 
 void planeFakeWP () {

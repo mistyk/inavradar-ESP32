@@ -70,9 +70,9 @@
 #define MSP_SET_RAW_GPS          201 // fix, numsat, lat, lon, alt, speed
 #define MSP_SET_WP               209 // sets a given WP (WP#, lat, lon, alt, flags)
 
-// squad commands
-#define MSP_SET_SQUAD_POS        248 //SET squad position information
-#define MSP_SET_SQUAD_ITD        249 //SET squad information to display
+// radar commands
+#define MSP_SET_RADAR_POS        248 //SET radar position information
+#define MSP_SET_RADAR_ITD        249 //SET radar information to display
 
 // v2 commands
 #define MSP2_ESP32 							 0x2040
@@ -642,7 +642,7 @@ struct msp_set_wp_t {
   uint8_t flag;     // 0xa5 = last, otherwise set to 0
 } __attribute__ ((packed));
 
-struct msp_raw_squad_pos_t {
+struct msp_radar_pos_t {
   uint8_t id;
   uint8_t state;    // disarmed(0) armed (1)
   int32_t lat;      // decimal degrees latitude * 10000000
@@ -653,17 +653,14 @@ struct msp_raw_squad_pos_t {
   char callsign0;
   char callsign1;
   char callsign2;
+  uint8_t seqNum;
 } __attribute__((packed));
 
-struct msp_raw_squad_itd_t {
+struct msp_radar_itd_t {
   uint8_t type;     // pps / rssi (0), staus msg (1)
-  char msg[20];     // "2/-85.2", "booting..." 
+  char msg[20];     // "2/-85.2", "booting..."
 } __attribute__((packed));
 
-typedef struct inav_radar_setup_s  {
-    bool frontview;
-    int8_t scale;
-} inav_radar_setup_t;
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
