@@ -68,7 +68,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
@@ -760,7 +760,8 @@ void loop() {
       getPlaneData();
       getPlanetArmed();
       getPlaneBat();
-      if (!pd.state) {
+      // if (!pd.state) {
+      if (1) {
         getPlaneGPS();
         if (pd.gps.fixType != 0) {
           homepos = pd.gps;
@@ -776,7 +777,8 @@ void loop() {
   if ((millis() - sendLastTime) > cfg.intervalSend ) {
     sendLastTime = millis()+ random(0, 50);
     if (String(pd.planeName) != "No Name" ) {
-      if (pd.state) {
+    //  if (pd.state) {
+      if (1) {
         getPlaneGPS();
         loraTX = 1;
         if (pd.gps.fixType != 0) {
