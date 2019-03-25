@@ -40,8 +40,11 @@ planeData fakepd; // debugging plane
 char planeFC[20]; // uav fc name
 bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
+uint8_t loraSeqNum = 0;
 int numPlanes = 0;
 String rssi = "0";
+uint8_t pps = 0;
+uint8_t ppsc = 0;
 bool buttonState = 1;
 bool buttonPressed = 0;
 long lastDebounceTime = 0;
@@ -65,7 +68,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
@@ -241,9 +244,9 @@ void cliConfig(int n) {
   serialConsole[n]->print("Debug output:          ");
   serialConsole[n]->println(cfg.debugOutput ? "ON" : "OFF");
   serialConsole[n]->print("Debug GPS lat:         ");
-  serialConsole[n]->println(cfg.debugGpsLat);
-  serialConsole[n]->print("Debug GPS lat:         ");
-  serialConsole[n]->println(cfg.debugGpsLon);
+  serialConsole[n]->println((float) cfg.debugGpsLat / 10000000);
+  serialConsole[n]->print("Debug GPS lon:         ");
+  serialConsole[n]->println((float) cfg.debugGpsLon / 10000000);
   serialConsole[n]->print("Local fake planes:     ");
   serialConsole[n]->println(cfg.debugFakeWPs ? "ON" : "OFF");
   serialConsole[n]->print("Radio fake planes:     ");
@@ -359,7 +362,8 @@ void initCli () {
       }
     }
     if (arg1 == "debuglat") {
-      if (arg2.toInt() >= 0) {
+      if (1) {
+        serialConsole[cNum]->println(arg2);
         float lat = arg2.toFloat() * 10000000;
         cfg.debugGpsLat = (int32_t) lat;
         saveConfig();
@@ -369,7 +373,7 @@ void initCli () {
       }
     }
     if (arg1 == "debuglon") {
-      if (arg2.toInt() >= 0) {
+      if (1) {
         float lon = arg2.toFloat() * 10000000;
         cfg.debugGpsLon = (int32_t) lon;
         saveConfig();
@@ -387,7 +391,6 @@ void initCli () {
   //cli->parse("hello");
 }
 // ----------------------------------------------------------------------------- LoRa
-uint8_t loraSeqNum = 0;
 void sendMessage(planeData *outgoing) {
   while (!LoRa.beginPacket()) {  }
   LoRa.write((uint8_t*)outgoing, sizeof(fakepd));
@@ -400,7 +403,8 @@ void onReceive(int packetSize) {
   //cliLog(loraMsg.header);
   //cliLog(cfg.loraHeader);
   if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
-      //rssi = String(LoRa.packetRssi());
+      rssi = String(LoRa.packetRssi());
+      ppsc++;
       loraRX = 1;
       pdIn = loraMsg;
       cliLog("New air packet");
@@ -483,8 +487,9 @@ void drawDisplay () {
     display.drawString (30,5, String(pd.gps.numSat));
     display.drawString (30,30, String(numPlanes));
     display.drawString (114,5, String((float)fcanalog.vbat/10));
-    display.drawString (114,30, rssi);
     display.setFont (ArialMT_Plain_10);
+    display.drawString (110,30, String(pps));
+    display.drawString (110,42, rssi);
     display.setTextAlignment (TEXT_ALIGN_LEFT);
     //if (pd.gps.fixType == 0) display.drawString (33,7, "NF");
     if (pd.gps.fixType == 1) display.drawString (33,7, "2D");
@@ -492,7 +497,8 @@ void drawDisplay () {
     display.drawString (33,16, "SAT");
     display.drawString (33,42, "UAV");
     display.drawString (116,16, "V");
-    display.drawString (116,42, "dB");
+    display.drawString (112,30, "pps");
+    display.drawString (112,42, "dB");
     if (String(planeFC) == String("No FC")) {
       if (cfg.debugOutput) {
         if (cfg.debugFakeWPs) display.drawString (0,54, "LFP");
@@ -563,35 +569,34 @@ void initDisplay () {
 void getPlanetArmed () {
   uint32_t planeModes;
   msp.getActiveModes(&planeModes);
-  //Serial.print("Arm State: ");
-  //Serial.println(bitRead(planeModes,0));
   pd.state = bitRead(planeModes,0);
+  cliLog("FC: Arm state " + String(pd.state));
 }
 
 void getPlaneGPS () {
   if (msp.request(MSP_RAW_GPS, &pd.gps, sizeof(pd.gps))) {
+    cliLog("FC: GPS " + String(pd.gps.fixType));
   }
 }
 
 void getPlaneBat () {
   if (msp.request(MSP_ANALOG, &fcanalog, sizeof(fcanalog))) {
-    //cliLog(String(fcanalog.vbat));
+    cliLog("FC: Bat " + String(fcanalog.vbat));
   }
 }
 void getPlaneStatusEx () {
   if (msp.request(MSP_STATUS_EX, &fcstatusex, sizeof(fcstatusex))) {
-    cliLog(String(bitRead(fcstatusex.armingFlags,18)));
-    //cliLog(String(fcanalog.vbat));
+    cliLog("FC: Status EX " + String(bitRead(fcstatusex.armingFlags,18)));
   }
 }
 void getPlaneData () {
   String("No Name").toCharArray(pd.planeName,20);
   String("No FC").toCharArray(planeFC,20);
   if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
-    //Serial.println(pd.planeName);
+    cliLog("FC: UAV name " + String(pd.planeName));
   }
   if (msp.request(2, &planeFC, sizeof(planeFC))) {
-    //Serial.println(planeFC);
+    cliLog("FC: Firmware " + String(planeFC));
   }
 }
 void planeSetWP () {
@@ -616,10 +621,7 @@ void planeSetWP () {
       msp.command(MSP_SET_WP, &wp, sizeof(wp));
       cliLog("Sent to FC - POI #" + String(wp.waypointNumber));
     }
-    //else break;
   }
-  //cliLog("POIs sent to FC.");
-  //msp.command(MSP_SET_WP, &wp, sizeof(wp));
 }
 void planeFakeWPv2 () {
   msp_raw_planes_t wp;
@@ -677,7 +679,6 @@ void initMSP () {
   cliLog("Waiting for FC to start ...");
   delay(cfg.fcTimeout*1000);
   getPlaneData();
-  //getPlanetArmed();
   getPlaneGPS();
   cliLog("FC detected: " + String(planeFC));
   display.drawString (100, 24, planeFC);
@@ -703,7 +704,6 @@ void IRAM_ATTR handleInterrupt() {
   portEXIT_CRITICAL_ISR(&mux);
 }
 
-
 void setup() {
   Serial.begin(115200);
   serialConsole[0] = &Serial;
@@ -719,7 +719,6 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
   for (size_t i = 0; i <= 4; i++) {
-    //pds[i].pd.loraAddress= 0x00;
     pds[i].waypointNumber = 0;
   }
   booted = 1;
@@ -741,6 +740,8 @@ void loop() {
 
   if (millis() - pdLastTime > cfg.intervalStatus) {
     numPlanes = 0;
+    pps = ppsc;
+    ppsc = 0;
     for (size_t i = 0; i <= 4; i++) {
       if (pds[i].waypointNumber != 0) numPlanes++;
       //if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
@@ -749,7 +750,6 @@ void loop() {
         planeSetWP();
         planeSetWP();
         pds[i].waypointNumber = 0;
-        //pds[i].pd.loraAddress = 0;
         rssi = "0";
         String("").toCharArray(pds[i].pd.planeName,20);
         cliLog("UAV DB delete POI #" + String(i+1));
