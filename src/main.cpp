@@ -765,7 +765,7 @@ void loop() {
         getPlaneGPS();
         if (pd.gps.fixType != 0) {
           homepos = pd.gps;
-          sendMessage(&pd);
+          //sendMessage(&pd);
           loraTX = 1;
         }
         LoRa.receive();
