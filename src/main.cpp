@@ -16,6 +16,7 @@ using namespace simplecli;
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
 #define CFGVER 15 // bump up to overwrite setting with new defaults
+#define VERSION "A7"
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -253,6 +254,8 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.debugFakePlanes ? "ON" : "OFF");
   serialConsole[n]->print("Move fake planes:      ");
   serialConsole[n]->println(cfg.debugFakeMoving ? "ON" : "OFF");
+  serialConsole[n]->print("Firmware version:      ");
+  serialConsole[n]->println(VERSION);
   serialConsole[n]->println("cfgend");
 }
 void cliDebug(int n) {
@@ -610,8 +613,8 @@ void planeSetWP () {
       radarPos.lat = pds[i].pd.gps.lat;
       radarPos.lon = pds[i].pd.gps.lon;
       radarPos.alt = pds[i].pd.gps.alt;
-      radarPos.heading = 0;
       radarPos.speed = pds[i].pd.gps.groundSpeed;
+      radarPos.heading = pds[i].pd.gps.groundCourse / 10;
       radarPos.seqNum = pds[i].pd.seqNum;
       radarPos.callsign0 = pds[i].pd.planeName[0];
       radarPos.callsign1 = pds[i].pd.planeName[1];
