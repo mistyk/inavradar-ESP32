@@ -6,6 +6,10 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 
 ![OSD](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
 
+## News
+
+Our brave team of testers is testing aplha 7 right now. If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
+
 ## Index
 [Hardware](#hardware)
 
@@ -90,6 +94,7 @@ $ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x10
 The output should look something like this:
 ![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
 
+## Commands
 (#commands)
 After the firmware is flashed on the devices you should see 'No FC' (or the name of the UAV) on the opposing display.
 If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
@@ -135,6 +140,7 @@ Thanks for testing! 😄 👍
 
 ## Contact
 (#contact)
+
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
 
 [Patreon](https://www.patreon.com/inavradar)
