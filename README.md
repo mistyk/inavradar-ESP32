@@ -139,7 +139,6 @@ Just activate MSP con the corrosponding UART, the speed is 115200.
 Thanks for testing! 😄 👍
 
 ## Contact
-(#contact)
 
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
 
