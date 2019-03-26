@@ -10,6 +10,8 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 
 Our brave team of testers is testing aplha 7 right now. If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
 
+Thanks to Olivier we now have 'the HUD' it's nealy augmented reality! 
+
 ## Index
 [Hardware](#hardware)
 
@@ -44,7 +46,7 @@ Everything here is WORK IN PROGRESS!
 The software is based on two components:
 - ESP32 LoRa part is found in this repo.
 It's developed using [PlatformIO](https://platformio.org/) plugin for [Atom](https://atom.io/) editor.
-- INAV OSD part repo is found [here](https://github.com/mistyk/inavRC2).
+- INAV OSD part repo is found [here](https://github.com/KingKone/inav).
 It's a fork from the INAV repo and instructions how to build can be found [here](https://github.com/iNavFlight/inav/blob/master/docs/development/Building%20in%20Docker.md).
 
 INAV-Radar is a experimental firmware based on INAV and is currently no part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
@@ -133,6 +135,7 @@ Attention !!! On Windows with Putty you must use [CRTL]-[J] instead of the [ENTE
 ## Wireing
 
 A [testing version](https://github.com/mistyk/inavradar-ESP32/releases) of INAV needs to be installed on your FC.
+
 To connect the ESP32 to the FC:
 - wire up +5V and GND
 - TX from FC to ESP RX pin 17
