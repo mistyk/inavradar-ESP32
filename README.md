@@ -8,7 +8,7 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 
 ## News
 
-Tests on aplha 7 look promissing!
+Tests on aplha 7 look promising!
 
 If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
 
