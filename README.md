@@ -8,9 +8,11 @@ INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flig
 
 ## News
 
-Our brave team of testers is testing aplha 7 right now. If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
+Tests on aplha 7 look promissing!
 
-Thanks to Olivier we now have 'the HUD' it's nealy augmented reality! 
+If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
+
+Thanks to Olivier we now have 'the HUD' it's nealy augmented reality!
 
 ## Index
 [Hardware](#hardware)
@@ -19,9 +21,11 @@ Thanks to Olivier we now have 'the HUD' it's nealy augmented reality!
 
 [Testing](#testing)
 
-[ESP32 Commands](#commands)
-
 [Wireing](#Wireing)
+
+[FC settings](#FC-settings)
+
+[ESP32 commands](#commands)
 
 [Contact](#contact)
 
@@ -98,14 +102,44 @@ $ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x10
 The output should look something like this:
 ![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
 
+## Wireing
+
+To connect the ESP32 to the FC:
+- wire up +5V and GND
+- TX from FC to ESP RX pin 17
+- RX from FC to ESP TX pin 23
+
+Thanks for testing! 😄 👍
+
+## FC settings
+
+Backup your FC settings, flash the current [testing version of INAV](https://github.com/mistyk/inavradar-ESP32/releases).
+
+Dump your backup back into the cli.
+
+Activate MSP on the corrosponding UART, the speed is 57600.
+
+```
+osd_layout 0 2 0 0 V        // Crosshair and the HUD ON
+osd_layout 0 43 0 0 H       // north map OFF
+osd_layout 0 44 0 0 H       // takeoff map OFF
+osd_layout 0 45 0 0 H       // radar map OFF
+
+set osd_camera_uptilt = 0   // the HUD: camera angle
+set osd_camera_fov_h = 135  // the HUD: field of view horizontal
+set osd_camera_fov_v = 85   // the HUD: field of view vertical
+```
+The HUD has an entry in the stick menu (OSD->HUD) where you can change this configuration at runtime.
+
 ## Commands
 
-After the firmware is flashed on the devices you should see 'No FC' (or the name of the UAV) on the opposing display.
-If only the bottom line with TX and RX is showing, something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)). Reset the device connected to the terminal and send us a copy of the output.
+If something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)).
 
-Via USB serial you get a small CLI with debug output.
+Attention !!! On Windows with Putty you must use [CRTL]-[J] instead of the [ENTER] key.
 
-Also there are some commands:
+Type in "debug" to activate debug mode. Reset the device (lower button) connected to the terminal and send us a copy of the output.
+
+Also there are some other commands:
 
 ```
 ================= Commands =================
@@ -129,21 +163,6 @@ rfp                     - Send fake plane via radio
 movefakeplanes          - Move fake plane
 mfp                     - Move fake plane
 ```
-
-Attention !!! On Windows with Putty you must use [CRTL]-[J] instead of the [ENTER] key.
-
-## Wireing
-
-A [testing version](https://github.com/mistyk/inavradar-ESP32/releases) of INAV needs to be installed on your FC.
-
-To connect the ESP32 to the FC:
-- wire up +5V and GND
-- TX from FC to ESP RX pin 17
-- RX from FC to ESP TX pin 23
-
-Just activate MSP con the corrosponding UART, the speed is 115200.
-
-Thanks for testing! 😄 👍
 
 ## Contact
 
