@@ -109,7 +109,6 @@ To connect the ESP32 to the FC:
 - TX from FC to ESP RX pin 17
 - RX from FC to ESP TX pin 23
 
-Thanks for testing! 😄 👍
 
 ## FC settings
 
@@ -119,6 +118,7 @@ Dump your backup back into the cli.
 
 Activate MSP on the corrosponding UART, the speed is 57600.
 
+OSD and HUD settings:
 ```
 osd_layout 0 2 0 0 V        // Crosshair and the HUD ON
 osd_layout 0 43 0 0 H       // north map OFF
@@ -130,6 +130,8 @@ set osd_camera_fov_h = 135  // the HUD: field of view horizontal
 set osd_camera_fov_v = 85   // the HUD: field of view vertical
 ```
 The HUD has an entry in the stick menu (OSD->HUD) where you can change this configuration at runtime.
+
+Thanks for testing! 😄 👍
 
 ## Commands
 
