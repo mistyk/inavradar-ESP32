@@ -30,6 +30,7 @@
 #define MSP_FC_VERSION             3
 #define MSP_BOARD_INFO             4
 #define MSP_BUILD_INFO             5
+#define MSP_NAME                  10   //out message          Returns user set board name - betaflight
 #define MSP_CALIBRATION_DATA      14
 #define MSP_FEATURE               36
 #define MSP_BOARD_ALIGNMENT       38

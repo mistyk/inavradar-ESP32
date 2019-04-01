@@ -1,3 +1,9 @@
+// lora modes
+#define LA_INIT   0
+#define LA_PICKUP 1
+#define LA_RX     2
+#define LA_TX     3
+
 struct config {
   uint8_t configVersion;
   char loraHeader[7]; // protocol identifier
@@ -6,6 +12,8 @@ struct config {
   uint32_t loraBandwidth; // 250000 bps
   uint8_t loraCodingRate4; // 6?
   uint8_t loraSpreadingFactor; // 7?
+  uint8_t loraPower; // 0-20
+  uint8_t loraPickupTime; // 5 sec
   uint16_t intervalSend; // in ms + random
   uint16_t intervalDisplay; // in ms
   uint16_t intervalStatus; // in ms
@@ -23,14 +31,15 @@ struct config {
 };
 
 struct planeData {
-  char header[7];
+  char header[5];
+  uint8_t id;
   uint8_t seqNum;
   char planeName[20];
-  int16_t state;
+  uint8_t state;
   msp_raw_gps_t gps;
 };
 struct planesData {
-  uint8_t waypointNumber;
+  uint8_t id;
   long lastUpdate;
   double distance;
   double rssi;

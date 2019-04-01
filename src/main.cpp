@@ -15,8 +15,8 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 15 // bump up to overwrite setting with new defaults
-#define VERSION "A7"
+#define CFGVER 20 // bump up to overwrite setting with new defaults
+#define VERSION "A8"
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -29,6 +29,7 @@ SSD1306 display (0x3c, 4, 15);
 long sendLastTime = 0;
 long displayLastTime = 0;
 long pdLastTime = 0;
+long pickupTime = 0;
 
 msp_analog_t fcanalog; // analog values from FC
 msp_status_ex_t fcstatusex; // extended status from FC
@@ -49,6 +50,8 @@ uint8_t ppsc = 0;
 bool buttonState = 1;
 bool buttonPressed = 0;
 long lastDebounceTime = 0;
+bool displayon = 1;
+uint8_t loraMode = 0; // 0 init, 1 pickup, 2 RX, 3 TX
 // ----------------------------------------------------------------------------- EEPROM / config
 void saveConfig () {
   for(size_t i = 0; i < sizeof(cfg); i++) {
@@ -67,13 +70,15 @@ void initConfig () {
   }
   if (cfg.configVersion != CFGVER) { // write default config
     cfg.configVersion = CFGVER;
-    String("ADS-RC").toCharArray(cfg.loraHeader,7); // protocol identifier
+    String("IRP2").toCharArray(cfg.loraHeader,5); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 bps
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
-    cfg.intervalSend = 500; // in ms + random
+    cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
+    cfg.loraPickupTime = 5; // in sec
+    cfg.intervalSend = 5000; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
@@ -204,9 +209,10 @@ void cliHelp(int n) {
   serialConsole[n]->println("config                  - List all settings");
   serialConsole[n]->println("config loraFreq n       - Set frequency in Hz (e.g. n = 433000000)");
   serialConsole[n]->println("config loraBandwidth n  - Set bandwidth in Hz (e.g. n = 250000)");
-  serialConsole[n]->println("config loraSpread n     - Set SF (e.g. n = 10)");
+  serialConsole[n]->println("config loraPower n      - Set output power (e.g. n = 0 - 20)");
   serialConsole[n]->println("config uavtimeout n     - Set UAV timeout in sec (e.g. n = 10)");
   serialConsole[n]->println("config fctimeout n      - Set FC timeout in sec (e.g. n = 5)");
+  serialConsole[n]->println("config radiointerval n  - Set radio interval in ms (e.g. n = 500)");
   serialConsole[n]->println("config debuglat n       - Set debug GPS lat (e.g. n = 50.1004900)");
   serialConsole[n]->println("config debuglon n       - Set debug GPS lon (e.g. n = 8.7632280)");
   serialConsole[n]->println("reboot                  - Reset MCU and radio");
@@ -232,12 +238,17 @@ void cliConfig(int n) {
   serialConsole[n]->println(cfg.loraSpreadingFactor);
   serialConsole[n]->print("Lora coding rate 4:    ");
   serialConsole[n]->println(cfg.loraCodingRate4);
+  serialConsole[n]->print("Lora power:            ");
+  serialConsole[n]->println(cfg.loraPower);
   serialConsole[n]->print("UAV timeout:           ");
   serialConsole[n]->print(cfg.uavTimeout);
   serialConsole[n]->println(" sec");
   serialConsole[n]->print("FC timeout:            ");
   serialConsole[n]->print(cfg.fcTimeout);
   serialConsole[n]->println(" sec");
+  serialConsole[n]->print("Radio interval:        ");
+  serialConsole[n]->print(cfg.intervalSend);
+  serialConsole[n]->println(" ms");
   serialConsole[n]->print("MSP RX pin:            ");
   serialConsole[n]->println(cfg.mspRX);
   serialConsole[n]->print("MSP TX pin:            ");
@@ -343,7 +354,16 @@ void initCli () {
         saveConfig();
         serialConsole[cNum]->println("Lora spreading factor changed!");
       } else {
-        serialConsole[cNum]->println("Lora Lora spreading factor not correct: 7 - 12");
+        serialConsole[cNum]->println("Lora spreading factor not correct: 7 - 12");
+      }
+    }
+    if (arg1 == "loraPower") {
+    if (arg2.toInt() >= 0 && arg2.toInt() <= 20) {
+        cfg.loraPower = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Lora power factor changed!");
+      } else {
+        serialConsole[cNum]->println("Lora power factor not correct: 0 - 20");
       }
     }
     if (arg1 == "fctimeout") {
@@ -353,6 +373,15 @@ void initCli () {
         serialConsole[cNum]->println("FC timout changed!");
       } else {
         serialConsole[cNum]->println("FC timout not correct: 1 - 250");
+      }
+    }
+    if (arg1 == "radiointerval") {
+      if (arg2.toInt() >= 50 && arg2.toInt() <= 1000) {
+        cfg.intervalSend = arg2.toInt();
+        saveConfig();
+        serialConsole[cNum]->println("Radio interval changed!");
+      } else {
+        serialConsole[cNum]->println("Radio interval not correct: 50 - 1000");
       }
     }
     if (arg1 == "uavtimeout") {
@@ -406,34 +435,19 @@ void onReceive(int packetSize) {
   //cliLog(loraMsg.header);
   //cliLog(cfg.loraHeader);
   if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
+      //cliLog(cfg.loraHeader);
       rssi = String(LoRa.packetRssi());
       ppsc++;
       loraRX = 1;
       pdIn = loraMsg;
       cliLog("New air packet");
-      bool found = 0;
-      int free = -1;
-      for (size_t i = 0; i <= 4; i++) {
-        if (String(pds[i].pd.planeName) == String(pdIn.planeName) ) { // update plane
-          pds[i].pd = pdIn;
-          pds[i].rssi = LoRa.packetRssi();
-          pds[i].pd.state = 1;
-          pds[i].waypointNumber = i+1;
-          pds[i].lastUpdate = millis();
-          found = 1;
-          cliLog("UAV DB update POI #" + String(i+1));
-          break;
-        }
-        if (free == -1 && pds[i].waypointNumber == 0) free = i; // find free slot
-      }
-      if (!found) { // if not there put it in free slot
-          pds[free].waypointNumber = free+1;
-          pds[free].pd = pdIn;
-          pds[free].pd.state = 1;
-          pds[free].lastUpdate = millis();
-          cliLog("UAV DB new POI #" + String(free+1));
-          free = 0;
-      }
+      uint8_t id = loraMsg.id - 1;
+      pds[id].id = loraMsg.id;
+      pds[id].pd = loraMsg;
+      pds[id].rssi = LoRa.packetRssi();
+      pds[id].pd.state = 1;
+      pds[id].lastUpdate = millis();
+      cliLog("UAV DB update POI #" + String(loraMsg.id));
   }
 }
 int moving = 0;
@@ -444,10 +458,14 @@ void sendFakePlanes () {
     if (!cfg.debugFakeMoving) moving = 0;
   }
   cliLog("Sending fake UAVs via radio ...");
-  String("ADS-RC").toCharArray(fakepd.header,7);
+  String("IRP2").toCharArray(fakepd.header,5);
   //fakepd.loraAddress = (char)5;
   String("Testplane #1").toCharArray(fakepd.planeName,20);
+  if (loraSeqNum < 255) loraSeqNum++;
+  else loraSeqNum = 0;
+  fakepd.seqNum = loraSeqNum;
   fakepd.state=  1;
+  fakepd.id = pd.id;
   fakepd.gps.alt = 300;
   fakepd.gps.groundSpeed = 450;
   fakepd.gps.lat = cfg.debugGpsLat; // + (250 * moving);
@@ -457,11 +475,11 @@ void sendFakePlanes () {
   moving++;
 }
 void initLora() {
-	display.drawString (0, 8, "LORA");
+	display.drawString (0, 16, "LORA");
   display.display();
   cliLog("Starting radio ...");
   //pd.loraAddress = cfg.loraAddress;
-  String(cfg.loraHeader).toCharArray(pd.header,7);
+  String(cfg.loraHeader).toCharArray(pd.header,5);
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
   if (!LoRa.begin(cfg.loraFrequency)) {
@@ -473,15 +491,39 @@ void initLora() {
   LoRa.setSignalBandwidth(cfg.loraBandwidth);
   LoRa.setCodingRate4(cfg.loraCodingRate4);
   LoRa.setSpreadingFactor(cfg.loraSpreadingFactor);
+  LoRa.setTxPower(cfg.loraPower,1);
+  LoRa.setOCP(200);
   LoRa.idle();
   LoRa.onReceive(onReceive);
   LoRa.enableCrc();
+  pd.id = 0;
+  loraMode = LA_INIT;
   LoRa.receive();
   cliLog("Radio started.");
-  display.drawString (100, 8, "OK");
+  display.drawString (100, 16, "OK");
   display.display();
 }
 // ----------------------------------------------------------------------------- Display
+void displayArmed () {
+  display.clear();
+  display.setFont (ArialMT_Plain_24);
+  display.setTextAlignment (TEXT_ALIGN_LEFT);
+  display.drawString (20,20, "Armed");
+  display.display();
+  delay(250);
+  display.clear();
+  display.display();
+  displayon = 0;
+}
+void displayDisarmed () {
+  display.clear();
+  display.setFont (ArialMT_Plain_24);
+  display.setTextAlignment (TEXT_ALIGN_LEFT);
+  display.drawString (20,20, "Disarmed");
+  display.display();
+  delay(250);
+  displayon = 1;
+}
 void drawDisplay () {
   display.clear();
   if (displayPage == 0) {
@@ -525,7 +567,7 @@ void drawDisplay () {
     else {
       display.setFont (ArialMT_Plain_10);
       for (size_t i = 0; i <=2 ; i++) {
-        if (pds[i].waypointNumber != 0) {
+        if (pds[i].id != 0) {
           display.setTextAlignment (TEXT_ALIGN_LEFT);
           display.drawString (0,i*16, pds[i].pd.planeName);
           display.drawString (0,8+i*16, "RSSI " + String(pds[i].rssi));
@@ -539,7 +581,7 @@ void drawDisplay () {
   if (displayPage == 2) {
     display.setFont (ArialMT_Plain_10);
     for (size_t i = 0; i <=1 ; i++) {
-      if (pds[i].waypointNumber != 0) {
+      if (pds[i].id != 0) {
         display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawString (0,i*16, pds[i+3].pd.planeName);
         display.drawString (0,8+i*16, "RSSI " + String(pds[i].rssi));
@@ -565,6 +607,8 @@ void initDisplay () {
   display.setTextAlignment (TEXT_ALIGN_LEFT);
   display.drawString (0, 0, "DISPLAY");
   display.drawString (100, 0, "OK");
+  display.drawString (0, 8, "FIRMWARE");
+  display.drawString (100, 8, VERSION);
   display.display();
   cliLog("Display started!");
 }
@@ -594,18 +638,23 @@ void getPlaneStatusEx () {
 }
 void getPlaneData () {
   String("No Name").toCharArray(pd.planeName,20);
-  String("No FC").toCharArray(planeFC,20);
-  if (msp.request(10, &pd.planeName, sizeof(pd.planeName))) {
+  if (msp.request(MSP_NAME, &pd.planeName, sizeof(pd.planeName))) {
+    if (String(pd.planeName) == "") {
+      for (size_t i = 0; i < 5; i++) {
+        pd.planeName[i] = (char) random(65,90);
+      }
+    }
     cliLog("FC: UAV name " + String(pd.planeName));
   }
-  if (msp.request(2, &planeFC, sizeof(planeFC))) {
+  String("No FC").toCharArray(planeFC,20);
+  if (msp.request(MSP_FC_VARIANT, &planeFC, sizeof(planeFC))) {
     cliLog("FC: Firmware " + String(planeFC));
   }
 }
 void planeSetWP () {
   msp_radar_pos_t radarPos;
   for (size_t i = 0; i <= 4; i++) {
-    if (pds[i].waypointNumber != 0) {
+    if (pds[i].id != 0) {
 //      wp.waypointNumber = pds[i].waypointNumber;
 //      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
       radarPos.id = i;
@@ -669,22 +718,22 @@ void planeFakeWP () {
 
 void initMSP () {
   cliLog("Starting MSP ...");
-  display.drawString (0, 16, "MSP ");
+  display.drawString (0, 24, "MSP ");
   display.display();
   delay(200);
   Serial1.begin(57600, SERIAL_8N1, cfg.mspRX , cfg.mspTX);
   msp.begin(Serial1);
   cliLog("MSP started!");
-  display.drawString (100, 16, "OK");
+  display.drawString (100, 24, "OK");
   display.display();
-  display.drawString (0, 24, "FC ");
+  display.drawString (0, 32, "FC ");
   display.display();
   cliLog("Waiting for FC to start ...");
   delay(cfg.fcTimeout*1000);
   getPlaneData();
   getPlaneGPS();
   cliLog("FC detected: " + String(planeFC));
-  display.drawString (100, 24, planeFC);
+  display.drawString (100, 32, planeFC);
   display.display();
 }
 // ----------------------------------------------------------------------------- main init
@@ -720,9 +769,8 @@ void setup() {
   pinMode(interruptPin, INPUT);
   buttonPressed = 0;
   attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
-
   for (size_t i = 0; i <= 4; i++) {
-    pds[i].waypointNumber = 0;
+    pds[i].id = 0;
   }
   booted = 1;
   serialConsole[0]->print("> ");
@@ -732,13 +780,46 @@ void setup() {
 void loop() {
   if ( (millis() - lastDebounceTime) > 150 && buttonPressed == 1) buttonPressed = 0;
 
-  if (millis() - displayLastTime > cfg.intervalDisplay) {
+  if (loraMode == LA_INIT && pd.id == 0) {
+    loraMode = LA_PICKUP;
+    pickupTime = millis();
+
+  }
+
+  if (loraMode == LA_PICKUP && millis() - pickupTime > cfg.loraPickupTime * 1000) {
+    numPlanes = 0;
+    for (size_t i = 0; i < sizeof(pds); i++) {
+      if (pds[i].id == 0 && pd.id == 0) {
+        pd.id = i+1;
+        loraMode = LA_RX;
+      }
+      if (pds[i].id != 0) numPlanes++;
+    }
+    if (pds[0].id == 1) sendLastTime = pds[0].lastUpdate;
+  }
+
+  if (loraMode == LA_RX) {
+    if (pd.id == 1 && (millis() - sendLastTime) > cfg.intervalSend) {
+      loraMode = LA_TX;
+      cliLog("Master TX");
+
+    }
+    if (pd.id > 1 && (millis() - sendLastTime) > cfg.intervalSend + (cfg.intervalSend / 5 * pd.id)) {
+      loraMode = LA_TX;
+      cliLog(String(pd.id) + " TX");
+      if (millis() - pds[0].lastUpdate > 2 * cfg.intervalSend) sendLastTime = sendLastTime + cfg.intervalSend;
+      else sendLastTime = pds[0].lastUpdate;
+    }
+
+  }
+
+  if (displayon && millis() - displayLastTime > cfg.intervalDisplay) {
     drawDisplay();
     readCli();
-
     loraTX = 0;
     loraRX = 0;
     displayLastTime = millis();
+    if (pd.state == 1) displayArmed();
   }
 
   if (millis() - pdLastTime > cfg.intervalStatus) {
@@ -746,26 +827,24 @@ void loop() {
     pps = ppsc;
     ppsc = 0;
     for (size_t i = 0; i <= 4; i++) {
-      if (pds[i].waypointNumber != 0) numPlanes++;
+      if (pds[i].id != 0) numPlanes++;
       //if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
-      if (pds[i].waypointNumber != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
+      if (pds[i].id != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
         pds[i].pd.state = 2;
         planeSetWP();
-        planeSetWP();
-        pds[i].waypointNumber = 0;
+        pds[i].id = 0;
         rssi = "0";
         String("").toCharArray(pds[i].pd.planeName,20);
         cliLog("UAV DB delete POI #" + String(i+1));
       }
     }
     //getPlaneStatusEx();
-    if (String(pd.planeName) != "No Name" ) {
-      getPlaneData();
+    if (String(planeFC) == "INAV" ) {
       getPlanetArmed();
       getPlaneBat();
-      // if (!pd.state) {
-      if (1) {
+      if (!pd.state) {
         getPlaneGPS();
+        if (displayon == 0) displayDisarmed();
         if (pd.gps.fixType != 0) {
           homepos = pd.gps;
           //sendMessage(&pd);
@@ -777,11 +856,9 @@ void loop() {
     pdLastTime = millis();
   }
 
-  if ((millis() - sendLastTime) > cfg.intervalSend ) {
-    sendLastTime = millis()+ random(0, 50);
+  if (loraMode == LA_TX) {
     if (String(pd.planeName) != "No Name" ) {
-    //  if (pd.state) {
-      if (1) {
+      if (pd.state) {
         getPlaneGPS();
         loraTX = 1;
         if (pd.gps.fixType != 0) {
@@ -789,16 +866,21 @@ void loop() {
           else loraSeqNum = 0;
           pd.seqNum = loraSeqNum;
           sendMessage(&pd);
+          LoRa.sleep();
           LoRa.receive();
         }
       }
       //if (pd.armState) planeSetWP();
-      planeSetWP();
+      if (String(planeFC) == "INAV" ) planeSetWP();
       if (cfg.debugFakeWPs) planeFakeWP();
     }
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
+      LoRa.sleep();
+      LoRa.receive();
       loraTX = 1;
     }
+    if (pd.id == 1) sendLastTime = millis();
+    loraMode = LA_RX;
   }
 }
