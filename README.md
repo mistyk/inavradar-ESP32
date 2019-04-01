@@ -2,7 +2,7 @@
 
 # LoRa based inter UAV communication
 
-INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flight control software, it relays information about UAVs in the area to the flight controller for display on the OSD. INAV-Radar does this by using [LoRa](https://en.wikipedia.org/wiki/LoRa) radio to broadcast position, altitude, speed and plane name. It also listens for other UAVs so INAV OSD  can display this information as a radar style map.
+INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flight control software, it relays information about UAVs in the area to the flight controller for display on the OSD. INAV-Radar does this by using [LoRa](https://en.wikipedia.org/wiki/LoRa) radio to broadcast position, altitude, speed and plane name. It also listens for other UAVs so INAV OSD  can display this information as a HUD.
 
 ![OSD](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/osd.jpg)
 
@@ -116,7 +116,7 @@ Backup your FC settings, flash the current [testing version of INAV](https://git
 
 Dump your backup back into the cli.
 
-Activate MSP on the corrosponding UART, the speed is 57600.
+Activate MSP on the corresponding UART, the speed is 57600.
 
 OSD and HUD settings:
 ```
@@ -129,6 +129,9 @@ set osd_camera_uptilt = 0   // the HUD: camera angle
 set osd_camera_fov_h = 135  // the HUD: field of view horizontal
 set osd_camera_fov_v = 85   // the HUD: field of view vertical
 ```
+
+Pleas also flash the extra Vision OSD fonts for signal strenth and the homing crosshair.
+
 The HUD has an entry in the stick menu (OSD->HUD) where you can change this configuration at runtime.
 
 Thanks for testing! 😄 👍
