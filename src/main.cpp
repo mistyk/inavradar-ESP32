@@ -78,7 +78,7 @@ void initConfig () {
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
     cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
     cfg.loraPickupTime = 5; // in sec
-    cfg.intervalSend = 5000; // in ms + random
+    cfg.intervalSend = 500; // in ms + random
     cfg.intervalDisplay = 100; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
