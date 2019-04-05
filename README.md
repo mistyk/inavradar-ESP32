@@ -130,7 +130,7 @@ set osd_camera_fov_h = 135  // the HUD: field of view horizontal
 set osd_camera_fov_v = 85   // the HUD: field of view vertical
 ```
 
-Pleas also flash the extra Vision OSD fonts for signal strenth and the homing crosshair.
+Please also flash the extra Vision OSD fonts for signal strenth and the homing crosshair.
 
 The HUD has an entry in the stick menu (OSD->HUD) where you can change this configuration at runtime.
 
