@@ -15,8 +15,8 @@ using namespace simplecli;
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 20 // bump up to overwrite setting with new defaults
-#define VERSION "A8"
+#define CFGVER 24 // bump up to overwrite setting with new defaults
+#define VERSION "A82"
 // ----------------------------------------------------------------------------- global vars
 config cfg;
 MSP msp;
@@ -30,6 +30,7 @@ long sendLastTime = 0;
 long displayLastTime = 0;
 long pdLastTime = 0;
 long pickupTime = 0;
+long currentUpdateTime = 0;
 
 msp_analog_t fcanalog; // analog values from FC
 msp_status_ex_t fcstatusex; // extended status from FC
@@ -72,14 +73,14 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("IRP2").toCharArray(cfg.loraHeader,5); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
-    cfg.loraBandwidth =  250000;// 250000 bps
+    cfg.loraFrequency = 915E6; // 433E6, 868E6, 915E6
+    cfg.loraBandwidth =  250000;// 250000 khz
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
     cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
     cfg.loraPickupTime = 5; // in sec
-    cfg.intervalSend = 500; // in ms + random
-    cfg.intervalDisplay = 100; // in ms
+    cfg.intervalSend = 333; // in ms
+    cfg.intervalDisplay = 150; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
     cfg.fcTimeout = 5; // in sec
@@ -149,6 +150,8 @@ String getValue(String data, char separator, int index) {
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
+
+
 // ----------------------------------------------------------------------------- CLI
 SimpleCLI* cli;
 
@@ -177,6 +180,7 @@ void readCli () {
   }
 }
 void cliLog (String log) {
+   //logger.append(log);
   if (cfg.debugOutput) {
     if (booted) {
       Serial.println();
@@ -269,6 +273,9 @@ void cliConfig(int n) {
   serialConsole[n]->println(VERSION);
   serialConsole[n]->println("cfgend");
 }
+void cliShowLog(int n) {
+  //logger.flush();
+}
 void cliDebug(int n) {
   cfg.debugOutput = !cfg.debugOutput;
   saveConfig();
@@ -317,6 +324,7 @@ void initCli () {
   cli->addCmd(new Command("status", [](Cmd* cmd) { cliStatus(cNum); } ));
   cli->addCmd(new Command("help", [](Cmd* cmd) { cliHelp(cNum); } ));
   cli->addCmd(new Command("debug", [](Cmd* cmd) { cliDebug(cNum); } ));
+  cli->addCmd(new Command("log", [](Cmd* cmd) { cliShowLog(cNum); } ));
   cli->addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
   cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
   cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
@@ -422,8 +430,15 @@ void initCli () {
   //cli->parse("ping");
   //cli->parse("hello");
 }
+// ----------------------------------------------------------------------------- Logger
+void initLogger () {
+
+}
 // ----------------------------------------------------------------------------- LoRa
 void sendMessage(planeData *outgoing) {
+  if (loraSeqNum < 255) loraSeqNum++;
+  else loraSeqNum = 0;
+  pd.seqNum = loraSeqNum;
   while (!LoRa.beginPacket()) {  }
   LoRa.write((uint8_t*)outgoing, sizeof(fakepd));
   LoRa.endPacket(false);
@@ -452,6 +467,9 @@ void onReceive(int packetSize) {
 }
 int moving = 0;
 void sendFakePlanes () {
+  if (loraSeqNum < 255) loraSeqNum++;
+  else loraSeqNum = 0;
+  pd.seqNum = loraSeqNum;
   if (cfg.debugFakeMoving && moving > 100) {
     moving = 0;
   } else {
@@ -540,6 +558,8 @@ void drawDisplay () {
     if (pd.gps.fixType == 1) display.drawString (33,7, "2D");
     if (pd.gps.fixType == 2) display.drawString (33,7, "3D");
     display.drawString (33,16, "SAT");
+    display.drawString (33,34, "ID");
+    display.drawString (49,34, String(pd.id));
     display.drawString (33,42, "UAV");
     display.drawString (116,16, "V");
     display.drawString (112,30, "pps");
@@ -637,13 +657,10 @@ void getPlaneStatusEx () {
   }
 }
 void getPlaneData () {
-  String("No Name").toCharArray(pd.planeName,20);
+  for (size_t i = 0; i < 5; i++) {
+    pd.planeName[i] = (char) random(65,90);
+  }
   if (msp.request(MSP_NAME, &pd.planeName, sizeof(pd.planeName))) {
-    if (String(pd.planeName) == "") {
-      for (size_t i = 0; i < 5; i++) {
-        pd.planeName[i] = (char) random(65,90);
-      }
-    }
     cliLog("FC: UAV name " + String(pd.planeName));
   }
   String("No FC").toCharArray(planeFC,20);
@@ -759,6 +776,7 @@ void IRAM_ATTR handleInterrupt() {
 void setup() {
   Serial.begin(115200);
   serialConsole[0] = &Serial;
+  initLogger();
   initCli();
   initConfig();
   initDisplay();
@@ -783,7 +801,6 @@ void loop() {
   if (loraMode == LA_INIT && pd.id == 0) {
     loraMode = LA_PICKUP;
     pickupTime = millis();
-
   }
 
   if (loraMode == LA_PICKUP && millis() - pickupTime > cfg.loraPickupTime * 1000) {
@@ -801,14 +818,19 @@ void loop() {
   if (loraMode == LA_RX) {
     if (pd.id == 1 && (millis() - sendLastTime) > cfg.intervalSend) {
       loraMode = LA_TX;
-      cliLog("Master TX");
+      cliLog("Master TX"  + String(millis() - sendLastTime));
+      sendLastTime = millis();
 
     }
-    if (pd.id > 1 && (millis() - sendLastTime) > cfg.intervalSend + (cfg.intervalSend / 5 * pd.id)) {
+    if (pd.id > 1 && currentUpdateTime != pds[0].lastUpdate && millis() - pds[0].lastUpdate > cfg.intervalSend / 5 * pd.id) {
       loraMode = LA_TX;
-      cliLog(String(pd.id) + " TX");
-      if (millis() - pds[0].lastUpdate > 2 * cfg.intervalSend) sendLastTime = sendLastTime + cfg.intervalSend;
-      else sendLastTime = pds[0].lastUpdate;
+      currentUpdateTime = pds[0].lastUpdate;
+      cliLog(String(pd.id) + " TX in time "  + String(millis() - sendLastTime));
+      sendLastTime = millis();
+    } else if (pd.id > 1 && (millis() - sendLastTime) > cfg.intervalSend && currentUpdateTime == pds[0].lastUpdate) {
+      loraMode = LA_TX;
+      cliLog(String(pd.id) + " TX no time "  + String(millis() - sendLastTime));
+      sendLastTime = millis();
     }
 
   }
@@ -842,45 +864,51 @@ void loop() {
     if (String(planeFC) == "INAV" ) {
       getPlanetArmed();
       getPlaneBat();
-      if (!pd.state) {
+      if (pd.state == 0) {
         getPlaneGPS();
         if (displayon == 0) displayDisarmed();
         if (pd.gps.fixType != 0) {
           homepos = pd.gps;
-          //sendMessage(&pd);
-          loraTX = 1;
         }
-        LoRa.receive();
       }
     }
     pdLastTime = millis();
   }
 
   if (loraMode == LA_TX) {
-    if (String(pd.planeName) != "No Name" ) {
-      if (pd.state) {
-        getPlaneGPS();
+    if (pd.state != 1) {
+      if (pd.gps.fixType != 0) {
+        homepos = pd.gps;
+        sendMessage(&pd);
         loraTX = 1;
-        if (pd.gps.fixType != 0) {
-          if (loraSeqNum < 255) loraSeqNum++;
-          else loraSeqNum = 0;
-          pd.seqNum = loraSeqNum;
-          sendMessage(&pd);
-          LoRa.sleep();
-          LoRa.receive();
-        }
+      } else {
+        pd.state = 2;
+        sendMessage(&pd);
+        loraTX = 1;
       }
-      //if (pd.armState) planeSetWP();
-      if (String(planeFC) == "INAV" ) planeSetWP();
-      if (cfg.debugFakeWPs) planeFakeWP();
+      LoRa.sleep();
+      LoRa.receive();
     }
+
+    if (pd.state == 1) {
+      getPlaneGPS();
+      loraTX = 1;
+      if (pd.gps.fixType != 0) {
+        sendMessage(&pd);
+        LoRa.sleep();
+        LoRa.receive();
+      }
+    }
+    //if (pd.armState) planeSetWP();
+    if (String(planeFC) == "INAV" ) planeSetWP();
+    if (cfg.debugFakeWPs) planeFakeWP();
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
       LoRa.sleep();
       LoRa.receive();
       loraTX = 1;
     }
-    if (pd.id == 1) sendLastTime = millis();
+    //if (pd.id == 1) sendLastTime = millis();
     loraMode = LA_RX;
   }
 }
