@@ -651,10 +651,7 @@ struct msp_radar_pos_t {
   int32_t alt;      // cm
   uint16_t heading; // deg
   uint16_t speed;   // cm/s
-  char callsign0;
-  char callsign1;
-  char callsign2;
-  uint8_t seqNum;
+  uint8_t lq;       // rssi
 } __attribute__((packed));
 
 struct msp_radar_itd_t {

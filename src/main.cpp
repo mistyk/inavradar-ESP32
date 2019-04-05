@@ -681,10 +681,8 @@ void planeSetWP () {
       radarPos.alt = pds[i].pd.gps.alt;
       radarPos.speed = pds[i].pd.gps.groundSpeed;
       radarPos.heading = pds[i].pd.gps.groundCourse / 10;
-      radarPos.seqNum = pds[i].pd.seqNum;
-      radarPos.callsign0 = pds[i].pd.planeName[0];
-      radarPos.callsign1 = pds[i].pd.planeName[1];
-      radarPos.callsign2 = pds[i].pd.planeName[2];
+      if (millis() - pds[i].lastUpdate < cfg.intervalSend+100) radarPos.lq =  constrain ( (130 + pds[i].rssi ) , 1 , 100);
+      else radarPos.lq = 0;
       msp.command(MSP_SET_RADAR_POS, &radarPos, sizeof(radarPos));
       cliLog("Sent to FC - POI #" + String(i));
     }
