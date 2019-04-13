@@ -2,10 +2,11 @@
 #include <esp_system.h>
 #include <lib/MSP.h>
 #include <lib/LoRa.h>
+#include <lib/CRC8.h>
 #include <SSD1306.h>
 #include <EEPROM.h>
 #include <SimpleCLI.h>
-using namespace simplecli;
+//using namespace simplecli;
 #include <main.h>
 
 #define SCK 5 // GPIO5 - SX1278's SCK
@@ -22,6 +23,8 @@ config cfg;
 MSP msp;
 bool booted = 0;
 Stream *serialConsole[1];
+CRC8 crc8;
+uint8_t FLchecksum;
 int cNum = 0;
 int displayPage = 0;
 SSD1306 display (0x3c, 4, 15);
@@ -73,7 +76,7 @@ void initConfig () {
     cfg.configVersion = CFGVER;
     String("IRP2").toCharArray(cfg.loraHeader,5); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 915E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 khz
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
@@ -153,14 +156,14 @@ String getValue(String data, char separator, int index) {
 
 
 // ----------------------------------------------------------------------------- CLI
-SimpleCLI* cli;
-
+SimpleCLI cli;
+Command Cmd;
 int  serIn;             // var that will hold the bytes-in read from the serialBuffer
 char serInString[100];  // array that will hold the different bytes  100=100characters;
                         // -> you must state how long the array will be else it won't work.
 int  serInIndx  = 0;    // index of serInString[] in which to insert the next incoming byte
 int  serOutIndx = 0;    // index of the outgoing serInString[] array;
-
+/*
 void readCli () {
   int sb;
   if(serialConsole[0]->available()) {
@@ -171,7 +174,7 @@ void readCli () {
       serialConsole[0]->write(sb);
       if (sb == '\n') {
         cNum = 0;
-        cli->parse(serInString);
+        cli.parse(serInString);
         serInIndx = 0;
         memset(serInString, 0, sizeof(serInString));
         serialConsole[0]->print("> ");
@@ -179,6 +182,7 @@ void readCli () {
     }
   }
 }
+*/
 void cliLog (String log) {
    //logger.append(log);
   if (cfg.debugOutput) {
@@ -191,6 +195,7 @@ void cliLog (String log) {
     }
   }
 }
+/*
 void cliStatus(int n) {
   serialConsole[n]->println("================== Status ==================");
   serialConsole[n]->print("FC:               ");
@@ -317,26 +322,26 @@ void cliFCpass(int n) {
 }
 
 void initCli () {
-  cli = new SimpleCLI();
-  cli->onNotFound = [](String str) {
-    Serial.println("\"" + str + "\" not found");
-  };
-  cli->addCmd(new Command("status", [](Cmd* cmd) { cliStatus(cNum); } ));
-  cli->addCmd(new Command("help", [](Cmd* cmd) { cliHelp(cNum); } ));
-  cli->addCmd(new Command("debug", [](Cmd* cmd) { cliDebug(cNum); } ));
-  cli->addCmd(new Command("log", [](Cmd* cmd) { cliShowLog(cNum); } ));
-  cli->addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
-  cli->addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
-  cli->addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
-  cli->addCmd(new Command("lfp", [](Cmd* cmd) { cliLocalFake(cNum); } ));
-  cli->addCmd(new Command("rfp", [](Cmd* cmd) { cliRadioFake(cNum); } ));
-  cli->addCmd(new Command("mfp", [](Cmd* cmd) { cliMoveFake(cNum); } ));
-  cli->addCmd(new Command("reboot", [](Cmd* cmd) { cliReboot(cNum); } ));
-  cli->addCmd(new Command("gpspos", [](Cmd* cmd) { cliGPSpos(cNum); } ));
+  //cli = new SimpleCLI();
+//  cli.onNotFound = [](String str) {
+//    Serial.println("\"" + str + "\" not found");
+//  };
+  cli.addCmd(new Command("status", [](Cmd* cmd) { cliStatus(cNum); } ));
+  cli.addCmd(new Command("help", [](Cmd* cmd) { cliHelp(cNum); } ));
+  cli.addCmd(new Command("debug", [](Cmd* cmd) { cliDebug(cNum); } ));
+  cli.addCmd(new Command("log", [](Cmd* cmd) { cliShowLog(cNum); } ));
+  cli.addCmd(new Command("localfakeplanes", [](Cmd* cmd) { cliLocalFake(cNum); } ));
+  cli.addCmd(new Command("radiofakeplanes", [](Cmd* cmd) { cliRadioFake(cNum); } ));
+  cli.addCmd(new Command("movefakeplanes", [](Cmd* cmd) { cliMoveFake(cNum); } ));
+  cli.addCmd(new Command("lfp", [](Cmd* cmd) { cliLocalFake(cNum); } ));
+  cli.addCmd(new Command("rfp", [](Cmd* cmd) { cliRadioFake(cNum); } ));
+  cli.addCmd(new Command("mfp", [](Cmd* cmd) { cliMoveFake(cNum); } ));
+  cli.addCmd(new Command("reboot", [](Cmd* cmd) { cliReboot(cNum); } ));
+  cli.addCmd(new Command("gpspos", [](Cmd* cmd) { cliGPSpos(cNum); } ));
 
   Command* config = new Command("config", [](Cmd* cmd) {
-    String arg1 = cmd->getValue(0);
-    String arg2 = cmd->getValue(1);
+    String arg1 = cmd.getValue(0);
+    String arg2 = cmd.getValue(1);
     if (arg1 == "") cliConfig(cNum);
     if (arg1 == "loraFreq") {
       if ( arg2.toInt() == 433E6 || arg2.toInt() == 868E6 || arg2.toInt() == 915E6) {
@@ -357,7 +362,7 @@ void initCli () {
       }
     }
     if (arg1 == "loraSpread") {
-    if (arg2.toInt() >= 7 && arg2.toInt() <= 12) {
+      if (arg2.toInt() >= 7 && arg2.toInt() <= 12) {
         cfg.loraSpreadingFactor = arg2.toInt();
         saveConfig();
         serialConsole[cNum]->println("Lora spreading factor changed!");
@@ -366,7 +371,7 @@ void initCli () {
       }
     }
     if (arg1 == "loraPower") {
-    if (arg2.toInt() >= 0 && arg2.toInt() <= 20) {
+      if (arg2.toInt() >= 0 && arg2.toInt() <= 20) {
         cfg.loraPower = arg2.toInt();
         saveConfig();
         serialConsole[cNum]->println("Lora power factor changed!");
@@ -426,10 +431,11 @@ void initCli () {
   config->addArg(new AnonymOptArg(""));
   config->addArg(new AnonymOptArg(""));
 
-  cli->addCmd(config);
-  //cli->parse("ping");
-  //cli->parse("hello");
+  cli.addCmd(config);
+  //cli.parse("ping");
+  //cli.parse("hello");
 }
+*/
 // ----------------------------------------------------------------------------- Logger
 void initLogger () {
 
@@ -775,11 +781,12 @@ void setup() {
   Serial.begin(115200);
   serialConsole[0] = &Serial;
   initLogger();
-  initCli();
+  //initCli();
   initConfig();
   initDisplay();
   initLora();
   delay(1500);
+  crc8.begin();
   initMSP();
   delay(1000);
   pinMode(interruptPin, INPUT);
@@ -835,7 +842,7 @@ void loop() {
 
   if (displayon && millis() - displayLastTime > cfg.intervalDisplay) {
     drawDisplay();
-    readCli();
+    //readCli();
     loraTX = 0;
     loraRX = 0;
     displayLastTime = millis();
