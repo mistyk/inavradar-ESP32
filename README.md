@@ -50,7 +50,7 @@ Everything here is WORK IN PROGRESS!
 The software is based on two components:
 - ESP32 LoRa part is found in this repo.
 It's developed using [PlatformIO](https://platformio.org/) plugin for [Atom](https://atom.io/) editor.
-- INAV OSD part repo is found [here](https://github.com/KingKone/inav).
+- INAV OSD part repo is found [here](https://github.com/OlivierC-FR/inav/tree/oc_hud).
 It's a fork from the INAV repo and instructions how to build can be found [here](https://github.com/iNavFlight/inav/blob/master/docs/development/Building%20in%20Docker.md).
 
 INAV-Radar is a experimental firmware based on INAV and is currently no part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
@@ -153,7 +153,7 @@ help                    - List all commands
 config                  - List all settings
 config loraFreq n       - Set frequency in Hz (e.g. n = 433000000)
 config loraBandwidth n  - Set bandwidth in Hz (e.g. n = 250000)
-config loraSpread n     - Set SF (e.g. n = 10)
+config loraSpread n     - Set SF (e.g. n = 7)
 config uavtimeout n     - Set UAV timeout in sec (e.g. n = 10)
 config fctimeout n      - Set FC timeout in sec (e.g. n = 5)
 config debuglat n       - Set debug GPS lat * 10000000 (e.g. n = 501004900)
