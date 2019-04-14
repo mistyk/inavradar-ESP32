@@ -224,7 +224,10 @@ struct msp_servo_configurations_t {
 } __attribute__ ((packed));
 
 
+/*
 #define MSP_MAX_SERVO_RULES (2 * MSP_MAX_SUPPORTED_SERVOS)
+
+
 
 // MSP_SERVO_MIX_RULES reply
 struct msp_servo_mix_rules_t {
@@ -237,7 +240,7 @@ struct msp_servo_mix_rules_t {
     uint8_t max;
   } mixRule[MSP_MAX_SERVO_RULES];
 } __attribute__ ((packed));
-
+*/
 
 #define MSP_MAX_SUPPORTED_MOTORS 8
 

@@ -1,79 +1,41 @@
-// lora modes
-#define LA_INIT   0
-#define LA_PICKUP 1
-#define LA_RX     2
-#define LA_TX     3
+
+#define LORA_INIT   0
+#define LORA_PICKUP 1
+#define LORA_RX     2
+#define LORA_TX     3
 
 struct config {
-  uint8_t configVersion;
-  char loraHeader[7]; // protocol identifier
-  uint8_t loraAddress; // local lora address
-  uint32_t loraFrequency; // 433E6, 868E6, 915E6
-  uint32_t loraBandwidth; // 250000 bps
-  uint8_t loraCodingRate4; // 6?
-  uint8_t loraSpreadingFactor; // 7?
-  uint8_t loraPower; // 0-20
-  uint8_t loraPickupTime; // 5 sec
-  uint16_t intervalSend; // in ms + random
-  uint16_t intervalDisplay; // in ms
-  uint16_t intervalStatus; // in ms
-  uint16_t uavTimeout; // in sec
-  uint8_t fcTimeout; // in sec
-  uint8_t mspTX; // pin for msp serial TX
-  uint8_t mspRX; // pin for msp serial RX
-  uint8_t mspPOI; // POI type: 1 (Wayponit), 2 (Plane)
-  bool debugOutput;
-  bool debugFakeWPs;
-  bool debugFakePlanes;
-  bool debugFakeMoving;
-  int32_t debugGpsLat; // decimal degrees lat * 10000000
-  int32_t debugGpsLon; // decimal degrees lon * 10000000
+  char lora_header[7];
+  uint32_t lora_frequency;
+  uint32_t lora_bandwidth;
+  uint8_t lora_coding_rate;
+  uint8_t lora_spreading_factor;
+  uint8_t lora_power;
+  uint8_t lora_pickup_delay;
+  uint16_t lora_cycle;
+  uint8_t lora_cycle_var; 
+  uint16_t display_cycle;
+  uint16_t main_cycle;
+  uint16_t peer_timeout;
+  uint8_t msp_fc_timeout;
+  uint8_t msp_tx_pin;
+  uint8_t msp_rx_pin;
 };
 
-struct planeData {
+struct peer_t {
   char header[5];
   uint8_t id;
-  uint8_t seqNum;
-  char planeName[20];
+  uint8_t tick;
+  char name[5];
   uint8_t state;
   msp_raw_gps_t gps;
 };
-struct planesData {
+
+struct peers_t {
   uint8_t id;
-  long lastUpdate;
-  double distance;
+  long updated;
   double rssi;
-  planeData pd;
-};
-const uint8_t activeSymbol[] PROGMEM = {
-    B00000000,
-    B00000000,
-    B00011000,
-    B00100100,
-    B01000010,
-    B01000010,
-    B00100100,
-    B00011000
+  peer_t peer;
 };
 
-const uint8_t inactiveSymbol[] PROGMEM = {
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00011000,
-    B00011000,
-    B00000000,
-    B00000000
-};
 
-const uint8_t warnSymbol[] PROGMEM = {
-    B00000000,
-    B00000000,
-    B00010000,
-    B00101000,
-    B00101000,
-    B01111100,
-    B01101100,
-    B11111110
-};
