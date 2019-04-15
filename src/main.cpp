@@ -16,9 +16,12 @@
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define CFGVER 24 // bump up to overwrite setting with new defaults
+#define CFGVER 25 // bump up to overwrite setting with new defaults
 #define VERSION "A82"
 // ----------------------------------------------------------------------------- global vars
+TaskHandle_t armedTask, gpsTask, batTask, posTask, mspTask;
+QueueHandle_t armedQ, gpsQ, batQ, posQ;
+
 config cfg;
 MSP msp;
 bool booted = 0;
@@ -35,7 +38,6 @@ long pdLastTime = 0;
 long pickupTime = 0;
 long currentUpdateTime = 0;
 
-msp_analog_t fcanalog; // analog values from FC
 msp_status_ex_t fcstatusex; // extended status from FC
 msp_raw_gps_t homepos; // set on arm
 planeData pd; // our uav data
@@ -43,6 +45,7 @@ planeData pdIn; // new air packet
 planeData loraMsg; // incoming packet
 planesData pds[5]; // uav db
 planeData fakepd; // debugging plane
+uint8_t planeBat = 0;
 char planeFC[20]; // uav fc name
 bool loraRX = 0; // display RX
 bool loraTX = 0; // display TX
@@ -72,7 +75,7 @@ void initConfig () {
     char data = EEPROM.read(i);
     ((char *)&cfg)[i] = data;
   }
-  if (cfg.configVersion != CFGVER) { // write default config
+  if (true) { //cfg.configVersion != CFGVER) { // write default config
     cfg.configVersion = CFGVER;
     String("IRP2").toCharArray(cfg.loraHeader,5); // protocol identifier
     //cfg.loraAddress = 2; // local lora address
@@ -82,7 +85,7 @@ void initConfig () {
     cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
     cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
     cfg.loraPickupTime = 5; // in sec
-    cfg.intervalSend = 333; // in ms
+    cfg.intervalSend = 100; // in ms
     cfg.intervalDisplay = 150; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
@@ -90,7 +93,7 @@ void initConfig () {
     cfg.mspTX = 23; // pin for msp serial TX
     cfg.mspRX = 17; // pin for msp serial RX
     cfg.mspPOI = 1; // POI type: 1 (Wayponit), 2 (Plane) # TODO
-    cfg.debugOutput = false;
+    cfg.debugOutput = true;
     cfg.debugFakeWPs = false;
     cfg.debugFakePlanes = false;
     cfg.debugFakeMoving = false;
@@ -153,8 +156,6 @@ String getValue(String data, char separator, int index) {
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
-
-
 // ----------------------------------------------------------------------------- CLI
 SimpleCLI cli;
 Command Cmd;
@@ -555,7 +556,7 @@ void drawDisplay () {
     display.setTextAlignment (TEXT_ALIGN_RIGHT);
     display.drawString (30,5, String(pd.gps.numSat));
     display.drawString (30,30, String(numPlanes));
-    display.drawString (114,5, String((float)fcanalog.vbat/10));
+    display.drawString (114,5, String((float)planeBat/10));
     display.setFont (ArialMT_Plain_10);
     display.drawString (110,30, String(pps));
     display.drawString (110,42, rssi);
@@ -639,29 +640,49 @@ void initDisplay () {
   cliLog("Display started!");
 }
 // ----------------------------------------------------------------------------- MSP and FC
-void getPlanetArmed () {
+void mspComms(void * pvParameters) {
+
+  long statusLastTime = 0;
+  long gpsLastTime = 0;
   uint32_t planeModes;
-  msp.getActiveModes(&planeModes);
-  pd.state = bitRead(planeModes,0);
-  cliLog("FC: Arm state " + String(pd.state));
+  bool planeState = 0;
+  msp_analog_t fcanalog; // analog values from FC
+  msp_raw_gps_t gps;
+
+  armedQ = xQueueCreate(2, sizeof(planeState));
+  batQ = xQueueCreate(2, sizeof(fcanalog.vbat));
+  gpsQ = xQueueCreate(2, sizeof(gps));
+
+  for(;;) {
+    if (String(planeFC) == "INAV" && millis() - statusLastTime > cfg.intervalStatus) {
+      if (msp.getActiveModes(&planeModes)) {
+        planeState = bitRead(planeModes,0);
+        if (xQueueSend(armedQ, ( void * ) &planeState, ( TickType_t ) 0) != pdPASS ) cliLog("armedQ full");
+        else cliLog("armedQ sent msg");
+        //cliLog("FC: Arm state " + String(pd.state));
+      }
+      if (msp.request(MSP_ANALOG, &fcanalog, sizeof(fcanalog))) {
+        if (xQueueSend(batQ, ( void * ) &fcanalog.vbat, ( TickType_t ) 0) != pdPASS ) cliLog("batQ full");
+        else cliLog("batQ sent msg");
+        //cliLog("FC: Bat " + String(fcanalog.vbat));
+      }
+      //if (msp.request(MSP_STATUS_EX, &fcstatusex, sizeof(fcstatusex))) {
+        //cliLog("FC: Status EX " + String(bitRead(fcstatusex.armingFlags,18)));
+      //}
+      statusLastTime = millis();
+    }
+    if (String(planeFC) == "INAV" && millis() - gpsLastTime > cfg.intervalSend) {
+      if (msp.request(MSP_RAW_GPS, &gps, sizeof(gps))) {
+        if (xQueueSend(gpsQ, ( void * ) &gps, ( TickType_t ) 0) != pdPASS ) cliLog("gpsQ full");
+        else cliLog("gpsQ sent msg");
+        //cliLog("FC: GPS " + String(pd.gps.fixType));
+      }
+      gpsLastTime = millis();
+    }
+    vTaskDelay(100);
+  }
 }
 
-void getPlaneGPS () {
-  if (msp.request(MSP_RAW_GPS, &pd.gps, sizeof(pd.gps))) {
-    cliLog("FC: GPS " + String(pd.gps.fixType));
-  }
-}
-
-void getPlaneBat () {
-  if (msp.request(MSP_ANALOG, &fcanalog, sizeof(fcanalog))) {
-    cliLog("FC: Bat " + String(fcanalog.vbat));
-  }
-}
-void getPlaneStatusEx () {
-  if (msp.request(MSP_STATUS_EX, &fcstatusex, sizeof(fcstatusex))) {
-    cliLog("FC: Status EX " + String(bitRead(fcstatusex.armingFlags,18)));
-  }
-}
 void getPlaneData () {
   for (size_t i = 0; i < 5; i++) {
     pd.planeName[i] = (char) random(65,90);
@@ -674,12 +695,11 @@ void getPlaneData () {
     cliLog("FC: Firmware " + String(planeFC));
   }
 }
-void planeSetWP () {
+
+void planeSetPosTask (void * pvParameters) {
   msp_radar_pos_t radarPos;
   for (size_t i = 0; i <= 4; i++) {
     if (pds[i].id != 0) {
-//      wp.waypointNumber = pds[i].waypointNumber;
-//      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
       radarPos.id = i;
       radarPos.state = pds[i].pd.state;
       radarPos.lat = pds[i].pd.gps.lat;
@@ -693,48 +713,14 @@ void planeSetWP () {
       cliLog("Sent to FC - POI #" + String(i));
     }
   }
+  vTaskDelete(NULL);
 }
-void planeFakeWPv2 () {
-  /*
-  msp_raw_planes_t wp;
-  wp.id = 1;
-  wp.arm_state = 1;
-  wp.lat = 50.1006770 * 10000000;
-  wp.lon = 8.7613380 * 10000000;
-  wp.alt = 100;
-  wp.heading = 0;
-  wp.speed = 0;
-  wp.callsign0 = 'D';
-  wp.callsign1 = 'A';
-  wp.callsign2 = 'N';
-  msp.commandv2(MSP2_ESP32, &wp, sizeof(wp));
-  */
+void planeSetPos () {
+  xTaskCreatePinnedToCore(planeSetPosTask,"status",10000,NULL,1,&posTask,0);
 }
 
-void planeFakeWP () {
-    msp_set_wp_t wp;
-    if (cfg.debugFakeMoving && moving > 100) {
-      moving = 0;
-    }
-    if (!cfg.debugFakeMoving) {
-      moving = 0;
-    }
+void planeFakePos () {
 
-    if (pd.gps.fixType > 0) {
-      wp.waypointNumber = 1;
-      wp.action = MSP_NAV_STATUS_WAYPOINT_ACTION_WAYPOINT;
-      wp.lat = homepos.lat-100 + (moving * 20);
-      wp.lon = homepos.lon;
-      wp.alt = homepos.alt + 300;
-      wp.p1 = 1000;
-      wp.p2 = 0;
-      wp.p3 = 1;
-      wp.flag = 0xa5;
-      msp.command(MSP_SET_WP, &wp, sizeof(wp));
-      cliLog("Fake POIs sent to FC.");
-    } else {
-      cliLog("Fake POIs waiting for GPS fix.");
-    }
 }
 
 void initMSP () {
@@ -752,7 +738,7 @@ void initMSP () {
   cliLog("Waiting for FC to start ...");
   delay(cfg.fcTimeout*1000);
   getPlaneData();
-  getPlaneGPS();
+  xTaskCreatePinnedToCore(mspComms,"msp",10000,NULL,1,&mspTask,0);
   cliLog("FC detected: " + String(planeFC));
   display.drawString (100, 32, planeFC);
   display.display();
@@ -858,7 +844,7 @@ void loop() {
       //if (pd.gps.fixType != 0) pds[i].distance = distanceEarth(pd.gps.lat/10000000, pd.gps.lon/10000000, pds[i].pd.gps.lat/10000000, pds[i].pd.gps.lon/10000000);
       if (pds[i].id != 0 && millis() - pds[i].lastUpdate > cfg.uavTimeout*1000 ) { // plane timeout
         pds[i].pd.state = 2;
-        planeSetWP();
+        //TplaneSetWP();
         pds[i].id = 0;
         rssi = "0";
         String("").toCharArray(pds[i].pd.planeName,20);
@@ -867,10 +853,13 @@ void loop() {
     }
     //getPlaneStatusEx();
     if (String(planeFC) == "INAV" ) {
-      getPlanetArmed();
-      getPlaneBat();
+      if (xQueueReceive(armedQ, &pd.state, (TickType_t) 0 ) == pdFALSE) cliLog("armedQ empty");
+      else cliLog("armedQ got msg");
+      if (xQueueReceive(batQ, &planeBat, (TickType_t) 0) == pdFALSE) cliLog("batQ empty");
+      else cliLog("batQ got msg");
       if (pd.state == 0) {
-        getPlaneGPS();
+        if (xQueueReceive(gpsQ, &pd.gps, (TickType_t) 0 ) == pdFALSE) cliLog("gpsQ empty");
+        else cliLog("gpsQ got msg");
         if (displayon == 0) displayDisarmed();
         if (pd.gps.fixType != 0) {
           homepos = pd.gps;
@@ -896,7 +885,8 @@ void loop() {
     }
 
     if (pd.state == 1) {
-      getPlaneGPS();
+      if (xQueueReceive(gpsQ, &pd.gps, (TickType_t) 0 ) == pdFALSE) cliLog("gpsQ empty");
+      else cliLog("gpsQ got msg");
       loraTX = 1;
       if (pd.gps.fixType != 0) {
         sendMessage(&pd);
@@ -905,8 +895,8 @@ void loop() {
       }
     }
     //if (pd.armState) planeSetWP();
-    if (String(planeFC) == "INAV" ) planeSetWP();
-    if (cfg.debugFakeWPs) planeFakeWP();
+  //  if (String(planeFC) == "INAV" ) planeSetPos();
+    if (cfg.debugFakeWPs) planeFakePos();
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
       LoRa.sleep();
