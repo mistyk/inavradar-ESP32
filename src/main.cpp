@@ -77,15 +77,16 @@ void initConfig () {
   }
   if (true) { //cfg.configVersion != CFGVER) { // write default config
     cfg.configVersion = CFGVER;
-    String("IRP2").toCharArray(cfg.loraHeader,5); // protocol identifier
+    cfg.loraHeader[0] = 'I'; // protocol identifier
+    cfg.loraHeader[1] = 'R'; // protocol identifier
     //cfg.loraAddress = 2; // local lora address
-    cfg.loraFrequency = 433E6; // 433E6, 868E6, 915E6
+    cfg.loraFrequency = 868E6; // 433E6, 868E6, 915E6
     cfg.loraBandwidth =  250000;// 250000 khz
     cfg.loraCodingRate4 = 6; // Error correction rate 4/6
-    cfg.loraSpreadingFactor = 8; // 7 is shortest time on air - 12 is longest
+    cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
     cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
     cfg.loraPickupTime = 5; // in sec
-    cfg.intervalSend = 100; // in ms
+    cfg.intervalSend = 500; // in ms
     cfg.intervalDisplay = 150; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
@@ -442,21 +443,21 @@ void initLogger () {
 
 }
 // ----------------------------------------------------------------------------- LoRa
-void sendMessage(planeData *outgoing) {
+void sendMessage() {
   if (loraSeqNum < 255) loraSeqNum++;
   else loraSeqNum = 0;
   pd.seqNum = loraSeqNum;
-  while (!LoRa.beginPacket()) {  }
-  LoRa.write((uint8_t*)outgoing, sizeof(fakepd));
+  while (!LoRa.beginPacket(0)) {  }
+  LoRa.write((uint8_t)pd, sizeof(pd));
   LoRa.endPacket(false);
 }
 
 void onReceive(int packetSize) {
   if (packetSize == 0) return;
   LoRa.readBytes((uint8_t *)&loraMsg, packetSize);
-  //cliLog(loraMsg.header);
+  cliLog(String(loraMsg.header[0]) + String(loraMsg.header[1]));
   //cliLog(cfg.loraHeader);
-  if (String(loraMsg.header) == String(cfg.loraHeader)) { // new plane data
+  if (loraMsg.header[0] == cfg.loraHeader[0] && loraMsg.header[1] == cfg.loraHeader[1]) { // new plane data
       //cliLog(cfg.loraHeader);
       rssi = String(LoRa.packetRssi());
       ppsc++;
@@ -483,9 +484,11 @@ void sendFakePlanes () {
     if (!cfg.debugFakeMoving) moving = 0;
   }
   cliLog("Sending fake UAVs via radio ...");
-  String("IRP2").toCharArray(fakepd.header,5);
+  //String("IRP2").toCharArray(fakepd.header,5);
+  fakepd.header[0] = 'I';
+  fakepd.header[1] = 'R';
   //fakepd.loraAddress = (char)5;
-  String("Testplane #1").toCharArray(fakepd.planeName,20);
+  String("Testplane #1").toCharArray(fakepd.planeName,8);
   if (loraSeqNum < 255) loraSeqNum++;
   else loraSeqNum = 0;
   fakepd.seqNum = loraSeqNum;
@@ -495,7 +498,7 @@ void sendFakePlanes () {
   fakepd.gps.groundSpeed = 450;
   fakepd.gps.lat = cfg.debugGpsLat; // + (250 * moving);
   fakepd.gps.lon = cfg.debugGpsLon + (250 * moving);
-  sendMessage(&fakepd);
+  sendMessage();
   cliLog("Fake UAVs sent.");
   moving++;
 }
@@ -504,7 +507,8 @@ void initLora() {
   display.display();
   cliLog("Starting radio ...");
   //pd.loraAddress = cfg.loraAddress;
-  String(cfg.loraHeader).toCharArray(pd.header,5);
+  pd.header[0] = cfg.loraHeader[0];
+  pd.header[1] = cfg.loraHeader[1];
   SPI.begin(5, 19, 27, 18);
   LoRa.setPins(SS,RST,DI0);
   if (!LoRa.begin(cfg.loraFrequency)) {
@@ -518,9 +522,10 @@ void initLora() {
   LoRa.setSpreadingFactor(cfg.loraSpreadingFactor);
   LoRa.setTxPower(cfg.loraPower,1);
   LoRa.setOCP(200);
+  //LoRa.setPreambleLength(2);
   LoRa.idle();
   LoRa.onReceive(onReceive);
-  LoRa.enableCrc();
+  //LoRa.enableCrc();
   pd.id = 0;
   loraMode = LA_INIT;
   LoRa.receive();
@@ -847,7 +852,7 @@ void loop() {
         //TplaneSetWP();
         pds[i].id = 0;
         rssi = "0";
-        String("").toCharArray(pds[i].pd.planeName,20);
+        String("").toCharArray(pds[i].pd.planeName,8);
         cliLog("UAV DB delete POI #" + String(i+1));
       }
     }
@@ -873,11 +878,11 @@ void loop() {
     if (pd.state != 1) {
       if (pd.gps.fixType != 0) {
         homepos = pd.gps;
-        sendMessage(&pd);
+        sendMessage();
         loraTX = 1;
       } else {
         pd.state = 2;
-        sendMessage(&pd);
+        sendMessage();
         loraTX = 1;
       }
       LoRa.sleep();
@@ -889,7 +894,7 @@ void loop() {
       else cliLog("gpsQ got msg");
       loraTX = 1;
       if (pd.gps.fixType != 0) {
-        sendMessage(&pd);
+        sendMessage();
         LoRa.sleep();
         LoRa.receive();
       }

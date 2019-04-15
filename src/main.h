@@ -6,7 +6,7 @@
 
 struct config {
   uint8_t configVersion;
-  char loraHeader[7]; // protocol identifier
+  char loraHeader[2]; // protocol identifier
   uint8_t loraAddress; // local lora address
   uint32_t loraFrequency; // 433E6, 868E6, 915E6
   uint32_t loraBandwidth; // 250000 bps
@@ -31,10 +31,10 @@ struct config {
 };
 
 struct planeData {
-  char header[5];
+  char header[2];
   uint8_t id;
   uint8_t seqNum;
-  char planeName[20];
+  char planeName[8];
   uint8_t state;
   msp_raw_gps_t gps;
 };
