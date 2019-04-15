@@ -86,7 +86,7 @@ void initConfig () {
     cfg.loraSpreadingFactor = 7; // 7 is shortest time on air - 12 is longest
     cfg.loraPower = 17; //17 PA OFF, 18-20 PA ON
     cfg.loraPickupTime = 5; // in sec
-    cfg.intervalSend = 500; // in ms
+    cfg.intervalSend = 333; // in ms
     cfg.intervalDisplay = 150; // in ms
     cfg.intervalStatus = 1000; // in ms
     cfg.uavTimeout = 8; // in sec
@@ -443,12 +443,12 @@ void initLogger () {
 
 }
 // ----------------------------------------------------------------------------- LoRa
-void sendMessage() {
+void sendMessage(planeData *outgoing) {
   if (loraSeqNum < 255) loraSeqNum++;
   else loraSeqNum = 0;
   pd.seqNum = loraSeqNum;
   while (!LoRa.beginPacket(0)) {  }
-  LoRa.write((uint8_t)pd, sizeof(pd));
+  LoRa.write((uint8_t*)outgoing, sizeof(pd));
   LoRa.endPacket(false);
 }
 
@@ -498,7 +498,7 @@ void sendFakePlanes () {
   fakepd.gps.groundSpeed = 450;
   fakepd.gps.lat = cfg.debugGpsLat; // + (250 * moving);
   fakepd.gps.lon = cfg.debugGpsLon + (250 * moving);
-  sendMessage();
+  sendMessage(&fakepd);
   cliLog("Fake UAVs sent.");
   moving++;
 }
@@ -878,11 +878,11 @@ void loop() {
     if (pd.state != 1) {
       if (pd.gps.fixType != 0) {
         homepos = pd.gps;
-        sendMessage();
+        sendMessage(&pd);
         loraTX = 1;
       } else {
         pd.state = 2;
-        sendMessage();
+        sendMessage(&pd);
         loraTX = 1;
       }
       LoRa.sleep();
@@ -894,7 +894,7 @@ void loop() {
       else cliLog("gpsQ got msg");
       loraTX = 1;
       if (pd.gps.fixType != 0) {
-        sendMessage();
+        sendMessage(&pd);
         LoRa.sleep();
         LoRa.receive();
       }
