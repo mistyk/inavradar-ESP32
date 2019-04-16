@@ -812,23 +812,21 @@ void loop() {
   }
 
   if (loraMode == LA_RX) {
-    if (pd.id == 1 && (millis() - sendLastTime) > cfg.intervalSend) {
+    if (pd.id == 1 && (millis() - sendLastTime) >= cfg.intervalSend) {
       loraMode = LA_TX;
       cliLog("Master TX"  + String(millis() - sendLastTime));
       sendLastTime = millis();
-
     }
-    if (pd.id > 1 && currentUpdateTime != pds[0].lastUpdate && millis() - pds[0].lastUpdate > cfg.intervalSend / 5 * pd.id) {
+    if (pd.id > 1 && currentUpdateTime != pds[pd.id-2].lastUpdate && millis() - pds[pd.id-2].lastUpdate >= 10) {
       loraMode = LA_TX;
-      currentUpdateTime = pds[0].lastUpdate;
+      currentUpdateTime = pds[pd.id-2].lastUpdate;
       cliLog(String(pd.id) + " TX in time "  + String(millis() - sendLastTime));
       sendLastTime = millis();
-    } else if (pd.id > 1 && (millis() - sendLastTime) > cfg.intervalSend && currentUpdateTime == pds[0].lastUpdate) {
+    } else if (pd.id > 1 && (millis() - sendLastTime) >= cfg.intervalSend && currentUpdateTime == pds[pd.id-2].lastUpdate) {
       loraMode = LA_TX;
       cliLog(String(pd.id) + " TX no time "  + String(millis() - sendLastTime));
       sendLastTime = millis();
     }
-
   }
 
   if (displayon && millis() - displayLastTime > cfg.intervalDisplay) {
