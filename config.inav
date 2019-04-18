@@ -1,3 +1,8 @@
+# INAV/MATEKF405 2.2.0 Apr  2 2019 / 09:08:29 (9776e4f)
+# GCC-6.3.1 20170620 (release) [ARM/embedded-6-branch revision 249437]
+
+# resources
+
 # mixer
 mmix 0  1.000 -1.000  1.000 -1.000
 mmix 1  1.000 -1.000 -1.000  1.000
@@ -8,7 +13,10 @@ mmix 3  1.000  1.000 -1.000 -1.000
 
 # servo
 
+# logic
+
 # feature
+feature -CURRENT_METER
 feature MOTOR_STOP
 feature GPS
 feature PWM_OUTPUT_ENABLE
@@ -21,7 +29,7 @@ feature PWM_OUTPUT_ENABLE
 serial 0 576 115200 38400 115200 115200
 serial 1 0 115200 38400 115200 115200
 serial 3 2 115200 38400 0 115200
-serial 4 1 115200 38400 0 115200
+serial 4 1 57600 38400 0 115200
 
 # led
 
@@ -31,29 +39,53 @@ serial 4 1 115200 38400 0 115200
 
 # aux
 aux 0 0 0 1975 2025
+aux 1 9 3 1950 2050
+aux 2 8 1 1950 2050
+aux 3 11 2 1950 2050
+aux 4 32 2 1450 1550
 
 # adjrange
 
 # rxrange
 
+# temp_sensor
+
+# wp
+#wp 0 invalid
+
 # osd_layout
-osd_layout 0 0 23 0 H
-osd_layout 0 1 25 11 V
+osd_layout 0 0 0 1 V
+osd_layout 0 1 25 0 V
 osd_layout 0 3 8 6 H
 osd_layout 0 4 8 6 H
 osd_layout 0 7 12 12 H
 osd_layout 0 9 1 2 H
 osd_layout 0 11 1 3 H
 osd_layout 0 12 1 4 H
-osd_layout 0 14 25 10 V
-osd_layout 0 15 25 9 V
+osd_layout 0 13 26 2 V
+osd_layout 0 14 0 0 V
+osd_layout 0 15 26 1 V
 osd_layout 0 20 15 0 V
 osd_layout 0 21 4 0 V
+osd_layout 0 22 9 1 H
+osd_layout 0 23 19 1 H
 osd_layout 0 28 23 11 H
-osd_layout 0 30 1 1 V
-osd_layout 0 45 0 0 V
+osd_layout 0 34 10 12 H
+osd_layout 1 0 0 1 V
+osd_layout 1 1 25 0 V
+osd_layout 1 2 0 0 V
+osd_layout 1 14 0 0 V
+osd_layout 1 20 15 0 V
+osd_layout 1 21 4 0 V
 
 # master
+set looptime = 500
+set gyro_hardware_lpf = 256HZ
+set gyro_lpf_hz = 90
+set gyro_notch1_hz = 400
+set gyro_notch1_cutoff = 300
+set gyro_notch2_hz = 200
+set gyro_notch2_cutoff = 100
 set acc_hardware = MPU6500
 set acczero_x = -13
 set acczero_y = -10
@@ -61,23 +93,43 @@ set acczero_z = -32
 set accgain_x = 4085
 set accgain_y = 4085
 set accgain_z = 4104
-set mag_hardware = NONE
-set magzero_x = 93
-set magzero_y = -88
-set magzero_z = -19
+set align_mag = CW270FLIP
+set mag_hardware = HMC5883
+set magzero_y = -76
+set magzero_z = -2
 set baro_hardware = BMP280
 set pitot_hardware = NONE
+set rssi_channel = 11
 set serialrx_provider = IBUS
 set min_throttle = 1065
 set motor_pwm_rate = 2000
-set motor_pwm_protocol = MULTISHOT
+set motor_pwm_protocol = ONESHOT125
+set failsafe_procedure = RTH
 set model_preview_type = 3
 set gps_sbas_mode = EGNOS
+set nav_extra_arming_safety = OFF
+set nav_wp_safe_distance = 65000
+set nav_auto_speed = 500
+set nav_land_slowdown_minalt = 300
 set name = Daniel
 
 # profile
 profile 1
 
+set mc_p_pitch = 48
+set mc_i_pitch = 50
+set mc_d_pitch = 22
+set mc_p_roll = 36
+set mc_i_roll = 40
+set mc_d_roll = 20
+set mc_p_yaw = 70
+set dterm_lpf_hz = 90
+set dterm_notch_hz = 260
+set dterm_notch_cutoff = 160
+set rc_yaw_expo = 70
+set roll_rate = 75
+set pitch_rate = 75
+set yaw_rate = 75
 
 # battery_profile
 battery_profile 1

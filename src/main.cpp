@@ -702,6 +702,7 @@ void getPlaneData () {
 }
 
 void planeSetPosTask (void * pvParameters) {
+  vTaskDelay(10);
   msp_radar_pos_t radarPos;
   for (size_t i = 0; i <= 4; i++) {
     if (pds[i].id != 0) {
@@ -808,15 +809,18 @@ void loop() {
       }
       if (pds[i].id != 0) numPlanes++;
     }
-    if (pds[0].id == 1) sendLastTime = pds[0].lastUpdate;
+    if (pd.id == 1 && numPlanes >= 1) sendLastTime = pds[1].lastUpdate + cfg.intervalSend - 50;
+    if (pd.id > 1) currentUpdateTime = pds[pd.id-2].lastUpdate;
   }
 
   if (loraMode == LA_RX) {
+    // ID 1
     if (pd.id == 1 && (millis() - sendLastTime) >= cfg.intervalSend) {
       loraMode = LA_TX;
       cliLog("Master TX"  + String(millis() - sendLastTime));
       sendLastTime = millis();
     }
+    // ID > 1
     if (pd.id > 1 && currentUpdateTime != pds[pd.id-2].lastUpdate && millis() - pds[pd.id-2].lastUpdate >= 10) {
       loraMode = LA_TX;
       currentUpdateTime = pds[pd.id-2].lastUpdate;
@@ -898,7 +902,7 @@ void loop() {
       }
     }
     //if (pd.armState) planeSetWP();
-  //  if (String(planeFC) == "INAV" ) planeSetPos();
+    if (String(planeFC) == "INAV" ) planeSetPos();
     if (cfg.debugFakeWPs) planeFakePos();
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
