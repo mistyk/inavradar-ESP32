@@ -684,8 +684,9 @@ void mspComms(void * pvParameters) {
       }
       gpsLastTime = millis();
     }
-    vTaskDelay(100);
+
   }
+  vTaskDelay(100);
 }
 
 void getPlaneData () {
@@ -719,6 +720,7 @@ void planeSetPosTask (void * pvParameters) {
       cliLog("Sent to FC - POI #" + String(i));
     }
   }
+  vTaskDelay(100);
   vTaskDelete(NULL);
 }
 void planeSetPos () {
@@ -789,6 +791,9 @@ void setup() {
   }
   booted = 1;
   serialConsole[0]->print("> ");
+  // https://community.hiveeyes.org/t/esp32-multicore-task-scheduling-and-its-watchdog-timers-wdt/1554/2
+  disableCore1WDT();
+  disableCore0WDT();
 }
 
 // ----------------------------------------------------------------------------- main loop
@@ -889,6 +894,7 @@ void loop() {
       }
       LoRa.sleep();
       LoRa.receive();
+
     }
 
     if (pd.state == 1) {
@@ -899,10 +905,12 @@ void loop() {
         sendMessage(&pd);
         LoRa.sleep();
         LoRa.receive();
+
       }
     }
     //if (pd.armState) planeSetWP();
-    if (String(planeFC) == "INAV" ) planeSetPos();
+    //if (String(planeFC) == "INAV" )
+    planeSetPos();
     if (cfg.debugFakeWPs) planeFakePos();
     if (cfg.debugFakePlanes) {
       sendFakePlanes();
@@ -912,5 +920,7 @@ void loop() {
     }
     //if (pd.id == 1) sendLastTime = millis();
     loraMode = LA_RX;
+
   }
+  vTaskDelay(10);
 }
