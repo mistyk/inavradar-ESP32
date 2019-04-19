@@ -1,7 +1,7 @@
 #define VERSION "O.0.9"
 
 #define LORA_INIT   0
-#define LORA_START  1
+#define LORA_SYNC   1
 #define LORA_RX     2
 #define LORA_TX     3
 
@@ -15,7 +15,7 @@
 #define LORA_CYCLE_TIMING_DELAY -16 // ms
 #define LORA_CYCLE_ANTIDRIFT_THRESHOLD 5 // ms
 #define LORA_CYCLE_ANTIDRIFT_CORRECTION 5 // ms
-#define MSP_CYCLE_DELAY 250 // ms
+#define MSP_CYCLE_DELAY 50 // ms
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
@@ -24,7 +24,7 @@
 #define CYCLE_DISPLAY 125 // ms
 #define CYCLE_STATS 1000 // ms
 
-#define LORA_MAXPEERS 4
+#define LORA_MAXPEERS 5
 
 #define LORA_PEER_TIMEOUT 3000 // ms
 #define SERIAL_FC_TIMEOUT 4000 // ms
@@ -86,7 +86,6 @@ struct stats_t {
     uint16_t last_rx_duration;
     uint16_t last_msp_duration;
     uint16_t last_oled_duration;
-    uint16_t last_msp_delay;
 };
 
 
