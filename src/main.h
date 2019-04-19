@@ -12,17 +12,19 @@
 #define LORA_POWER 20
 #define LORA_CYCLE 500 // ms
 #define LORA_CYCLE_SLOTSPACING 100 // ms
-#define LORA_CYCLE_TIMING_DELAY -10 // ms
-#define LORA_CYCLE_ANTICOLLISION 30 // ms
+#define LORA_CYCLE_TIMING_DELAY -16 // ms
+#define LORA_CYCLE_ANTIDRIFT_THRESHOLD 5 // ms
+#define LORA_CYCLE_ANTIDRIFT_CORRECTION 5 // ms
+#define MSP_CYCLE_DELAY 250 // ms
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
 #define CYCLE_SCAN 4000 // ms
-#define CYCLE_DISPLAY 200 // ms
-#define CYCLE_MAIN 1000 // ms
+#define CYCLE_DISPLAY 125 // ms
+#define CYCLE_STATS 1000 // ms
 
-#define LORA_MAXPEERS 8
+#define LORA_MAXPEERS 4
 
 #define LORA_PEER_TIMEOUT 3000 // ms
 #define SERIAL_FC_TIMEOUT 4000 // ms
@@ -34,44 +36,59 @@
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
 
-#define FC_NONE 0
-#define FC_INAV 1
+#define HOST_NONE 0
+#define HOST_INAV 1
+#define HOST_BTFL 2
 
-char fc_name[2][5]={"None", "iNav"};
+char host_name[3][5]={"NoFC", "iNav", "Beta"};
 
 struct peer_t {
-  uint8_t id;
-  uint8_t state;
-  char name[6];
-  uint8_t tick;
-  uint32_t updated;
-  int rssi;
-  msp_raw_gps_t gps;
+   uint8_t id;
+   uint8_t state;
+   char name[6];
+   uint8_t host;  
+   uint8_t tick;
+   uint32_t updated;
+   int rssi;
+   msp_raw_gps_t gps;
 };
 
 struct curr_t {
-  uint8_t id;
-  uint8_t state;
-  char name[16];
-  uint8_t tick;
-  msp_raw_gps_t gps;
-  msp_analog_t vbat;
-  uint8_t fc;
+    uint8_t id;
+    uint8_t state;
+    char name[16];
+    uint8_t tick;
+    msp_raw_gps_t gps;
+    msp_analog_t vbat;
+    uint8_t host;
 };
 
 struct peer_air_t {
-  uint8_t id;
-  char name[3];
-  uint8_t tick;
-  int32_t  lat; 
-  int32_t  lon;
-  int16_t  alt; 
-  int16_t  speed;  
-  int16_t  heading; 
+    uint8_t id;
+    char name[3];
+    uint8_t host;
+    uint8_t tick;
+    int32_t  lat; 
+    int32_t  lon;
+    int16_t  alt; 
+    int16_t  speed;  
+    int16_t  heading; 
 };
 
 struct stats_t {
-  float packets_total;
-  uint32_t packets_received;
-  uint8_t percent_received;
+    uint32_t timer_begin;
+    uint32_t timer_end;    
+    float packets_total;
+    uint32_t packets_received;
+    uint8_t percent_received;
+    uint16_t last_tx_begin;
+    uint16_t last_tx_duration;
+    uint16_t last_rx_duration;
+    uint16_t last_msp_duration;
+    uint16_t last_oled_duration;
+    uint16_t last_msp_delay;
 };
+
+
+
+
