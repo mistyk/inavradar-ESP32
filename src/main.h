@@ -17,7 +17,7 @@
 #define LORA_CYCLE_ANTIDRIFT_CORRECTION 5 // ms
 #define MSP_CYCLE_DELAY 100 // ms
 
-#define LORA_NAME_LENGTH 5
+#define LORA_NAME_LENGTH 4
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
@@ -28,7 +28,7 @@
 
 #define LORA_MAXPEERS 5
 
-#define LORA_PEER_TIMEOUT 3000 // ms
+#define LORA_PEER_TIMEOUT 4000 // ms
 #define SERIAL_FC_TIMEOUT 4000 // ms
 
 #define SCK 5 // GPIO5 - SX1278's SCK
@@ -47,7 +47,7 @@ char host_name[3][5]={"NoFC", "iNav", "Beta"};
 struct peer_t {
    uint8_t id;
    uint8_t state;
-   char name[LORA_NAME_LENGTH];
+   char name[LORA_NAME_LENGTH + 1];
    uint8_t host;  
    uint8_t tick;
    uint32_t updated;
@@ -69,7 +69,7 @@ struct peer_air_t {
     uint8_t id;
     uint8_t host;
     uint8_t tick;
-    uint8_t lat; 
+    int32_t lat; 
     int32_t lon;
     int16_t alt; 
     int16_t speed;  

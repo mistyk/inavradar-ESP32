@@ -59,7 +59,7 @@ uint32_t now = 0;
 void lora_send(peer_air_t *outgoing) {
 
     while (!LoRa.beginPacket()) {  }
-    LoRa.write((uint8_t*)outgoing, sizeof(outgoing));
+    LoRa.write((uint8_t*)outgoing, sizeof(peerout));
     LoRa.endPacket(false);
 
 }
@@ -71,6 +71,7 @@ void onReceive(int packetSize) {
     LoRa.readBytes((uint8_t *)&incoming, packetSize);
     sys_rssi = LoRa.packetRssi();
     sys_ppsc++;
+
 
     uint8_t id = incoming.id - 1;
 
@@ -94,7 +95,7 @@ void onReceive(int packetSize) {
     peers[id].tick = incoming.tick;
 
     strncpy(peers[id].name, incoming.name, LORA_NAME_LENGTH);
- //   peers[id].name[LORA_NAME_LENGTH - 1] = 0;
+    peers[id].name[LORA_NAME_LENGTH] = 0;
 
     stats.timer_end = millis();
     stats.last_rx_duration = stats.timer_end - lora_last_rx;
@@ -238,7 +239,7 @@ void display_draw() {
                 display.setTextAlignment (TEXT_ALIGN_LEFT);
                 display.drawString (0, line, String(peers[i].id) + ":");
                 display.drawString (16, line, String(peers[i].name));
-                display.drawString (48, line, String(host_name[peers[i].host]));
+                display.drawString (56, line, String(host_name[peers[i].host]));
                 display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
                 if (lora_last_tx > peers[i].updated) {
@@ -295,33 +296,34 @@ void display_draw() {
         display.drawString (96, 0, String(host_name[curr.host]));
 
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
-        display.drawString (120, 10, String((float)curr.gps.lat/10000000,6));
-        display.drawString (120, 20, String((float)curr.gps.lon/10000000,6));
+        display.drawString (120, 10, String((float)curr.gps.lat/10000000, 6));
+        display.drawString (120, 20, String((float)curr.gps.lon/10000000, 6));
         display.drawString (120, 30, String((float)curr.gps.alt));
         display.drawString (120, 40, String(peerout.tick));
-        }
+     }
     else if (sys_display_page == 4) {
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
 
-		int j = 0;
-		for (int i = 0; i < LORA_MAXPEERS ; i++) {
-		    if (peers[i].id > 0 && j < 3) {
+        int j = 0;
+        for (int i = 0; i < LORA_MAXPEERS ; i++) {
+            if (peers[i].id > 0 && j < 3) {
                 line = j * 20;
                 display.setTextAlignment (TEXT_ALIGN_LEFT);
                 display.drawString (0, line, String(peers[i].id) + ":");
                 display.drawString (13, line, String(peers[i].name));
-				display.drawString (13, line + 10, "LQ" + String(peers[i].rssi));
-                display.drawString (61, line + 10, String(peers[i].tick));
+                display.drawString (13, line + 10, "LQ " + String(peers[i].rssi));
+                display.drawString (58, line + 10, String(peers[i].tick));
 
                 display.setTextAlignment (TEXT_ALIGN_RIGHT);
-                display.drawString (128, line, String((float)peers[i].gps.lat/10000000,6));
-                display.drawString (128, line + 10, String((float)peers[i].gps.lon/10000000,6));
+                display.drawString (128, line, String((float)peers[i].gps.lat/10000000,5));
+                display.drawString (128, line + 10, String((float)peers[i].gps.lon/10000000,5));
+
                 j++;
             }
-		}
+        }
     }
-	last_received_id = 0;
+    last_received_id = 0;
     sys_message[0] = 0;
     display.display();
 }
@@ -340,22 +342,21 @@ void msp_set_name() {
     //
     }
     else {
-        for (int i = 0; i < LORA_NAME_LENGTH - 1; i++) {
+        for (int i = 0; i < LORA_NAME_LENGTH; i++) {
             curr.name[i] = (char) random(65, 90);
         }
-        curr.name[LORA_NAME_LENGTH - 1] = 0;
+        curr.name[LORA_NAME_LENGTH] = 0;
     }
-
 }
 
 void msp_set_fc() {
     char j[5];
     msp.request(MSP_FC_VARIANT, &j, sizeof(j));
 
-    if (strcmp(j, "INAV") == 0) {
+    if (strncmp(j, "INAV", 4) == 0) {
         curr.host = HOST_INAV;
     }
-    else if (strcmp(j, "BTFL") == 0) {
+    else if (strncmp(j, "BTFL", 4) == 0) {
         curr.host = HOST_BTFL;
     }
     else {
@@ -463,7 +464,11 @@ void setup() {
     curr.id = 0;
     strncpy(peerout.name, curr.name, LORA_NAME_LENGTH);
     peerout.host = curr.host;
-
+    curr.gps.fixType = 0;
+    curr.gps.lat = 0;
+    curr.gps.lon = 0;
+    curr.gps.alt = 0;
+    
     LoRa.sleep();
     LoRa.receive();
 
@@ -559,24 +564,21 @@ void loop() {
 
     if (lora_mode == LORA_TX) {
 
-        if (curr.host != HOST_NONE) {
-
-            if (curr.gps.fixType > 0) {
-                peerout.lat = curr.gps.lat;
-                peerout.lon = curr.gps.lon;
-                peerout.alt = curr.gps.alt;
-                peerout.speed = curr.gps.groundSpeed;
-                peerout.heading = curr.gps.groundCourse;
-            }
-            else {
-                peerout.lat = 128;
-                peerout.lon = 222222222;
-                peerout.alt = 333;
-                peerout.speed = 0;
-                peerout.heading = 0;
-            }
+        if ((curr.host != HOST_NONE) && (curr.gps.fixType > 0)) {
+            peerout.lat = curr.gps.lat;
+            peerout.lon = curr.gps.lon;
+            peerout.alt = curr.gps.alt;
+            peerout.speed = curr.gps.groundSpeed;
+            peerout.heading = curr.gps.groundCourse;
         }
-
+        else {
+            peerout.lat = 0;
+            peerout.lon = 0;
+            peerout.alt = 0;
+            peerout.speed = 0;
+            peerout.heading = 0;
+        }
+        
         peerout.tick++;
 
         stats.last_tx_begin = millis();
