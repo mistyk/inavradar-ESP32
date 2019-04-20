@@ -654,7 +654,7 @@ struct msp_radar_pos_t {
   int32_t alt;      // cm
   uint16_t heading; // deg
   uint16_t speed;   // cm/s
-  uint8_t lq;       // rssi
+  uint8_t tick;       // rssi
 } __attribute__((packed));
 
 struct msp_radar_itd_t {

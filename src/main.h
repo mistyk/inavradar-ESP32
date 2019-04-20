@@ -15,7 +15,9 @@
 #define LORA_CYCLE_TIMING_DELAY -16 // ms
 #define LORA_CYCLE_ANTIDRIFT_THRESHOLD 5 // ms
 #define LORA_CYCLE_ANTIDRIFT_CORRECTION 5 // ms
-#define MSP_CYCLE_DELAY 50 // ms
+#define MSP_CYCLE_DELAY 100 // ms
+
+#define LORA_NAME_LENGTH 5
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
@@ -45,34 +47,34 @@ char host_name[3][5]={"NoFC", "iNav", "Beta"};
 struct peer_t {
    uint8_t id;
    uint8_t state;
-   char name[6];
+   char name[LORA_NAME_LENGTH];
    uint8_t host;  
    uint8_t tick;
    uint32_t updated;
    int rssi;
    msp_raw_gps_t gps;
-};
+   };
 
 struct curr_t {
     uint8_t id;
     uint8_t state;
+    uint8_t host;
     char name[16];
     uint8_t tick;
     msp_raw_gps_t gps;
     msp_analog_t vbat;
-    uint8_t host;
 };
 
 struct peer_air_t {
     uint8_t id;
-    char name[3];
     uint8_t host;
     uint8_t tick;
-    int32_t  lat; 
-    int32_t  lon;
-    int16_t  alt; 
-    int16_t  speed;  
-    int16_t  heading; 
+    uint8_t lat; 
+    int32_t lon;
+    int16_t alt; 
+    int16_t speed;  
+    int16_t heading; 
+    char name[LORA_NAME_LENGTH];
 };
 
 struct stats_t {
