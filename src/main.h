@@ -1,4 +1,4 @@
-#define VERSION "O.0.9"
+#define VERSION "0.9"
 
 #define LORA_INIT   0
 #define LORA_SYNC   1
@@ -28,7 +28,7 @@
 
 #define LORA_MAXPEERS 5
 
-#define LORA_PEER_TIMEOUT 4000 // ms
+#define LORA_PEER_TIMEOUT 5000 // ms
 #define SERIAL_FC_TIMEOUT 4000 // ms
 
 #define SCK 5 // GPIO5 - SX1278's SCK

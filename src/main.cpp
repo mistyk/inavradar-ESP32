@@ -52,6 +52,7 @@ uint32_t msp_next_cycle = 0;
 int msp_step = 0;
 uint32_t display_updated = 0;
 uint32_t now = 0;
+int drift_correction = 0;
 
 
 // -------- LoRa
@@ -168,6 +169,7 @@ void display_draw() {
         display.drawString (80, 35, String(peerout.tick));
 
         display.setTextAlignment (TEXT_ALIGN_LEFT);
+        display.drawString (60, 00, String(sys_message));
         display.drawString (60, 21, String(curr.name));
         display.drawString (27, 12, "SAT");
         display.drawString (108, 45, "%E");
@@ -260,24 +262,24 @@ void display_draw() {
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "TX TIME");
-        display.drawString(0, 10, "RX TIME");
-        display.drawString(0, 20, "MSP TIME");
-        display.drawString(0, 30, "OLED TIME");
-        display.drawString(0, 40, "LORA CYCLE");
+//        display.drawString(0, 10, "RX TIME");
+        display.drawString(0, 10, "MSP TIME");
+        display.drawString(0, 20, "OLED TIME");
+        display.drawString(0, 30, "LORA CYCLE");
 
         display.drawString(112, 0, "ms");
         display.drawString(112, 10, "ms");
         display.drawString(112, 20, "ms");
         display.drawString(112, 30, "ms");
-        display.drawString(112, 40, "ms");
+//        display.drawString(112, 40, "ms");
 
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
         display.drawString (111, 0, String(stats.last_tx_duration));
         // display.drawString (111, 10, String(stats.last_rx_duration));
-        display.drawString (111, 10, "--");
-        display.drawString (111, 20, String(stats.last_msp_duration));
-        display.drawString (111, 30, String(stats.last_oled_duration));
-        display.drawString (111, 40, String(LORA_CYCLE));
+//        display.drawString (111, 10, "--");
+        display.drawString (111, 10, String(stats.last_msp_duration));
+        display.drawString (111, 20, String(stats.last_oled_duration));
+        display.drawString (111, 30, String(LORA_CYCLE));
 
         }
 
@@ -307,14 +309,17 @@ void display_draw() {
 
         int j = 0;
         for (int i = 0; i < LORA_MAXPEERS ; i++) {
-            if (peers[i].id > 0 && j < 3) {
-                line = j * 20;
+            if (peers[i].id > 0 && j < 2) {
+                line = j * 30;
                 display.setTextAlignment (TEXT_ALIGN_LEFT);
                 display.drawString (0, line, String(peers[i].id) + ":");
                 display.drawString (13, line, String(peers[i].name));
+                display.drawString (50, line, String(host_name[peers[i].host]));
                 display.drawString (13, line + 10, "LQ " + String(peers[i].rssi));
-                display.drawString (58, line + 10, String(peers[i].tick));
-
+                display.drawString (50, line + 10, String(peers[i].tick));
+                display.drawString (13, line + 20, "S:" + String(peers[i].gps.groundSpeed));
+                display.drawString (80, line + 20, "H:" + String(peers[i].gps.groundCourse / 10));
+                
                 display.setTextAlignment (TEXT_ALIGN_RIGHT);
                 display.drawString (128, line, String((float)peers[i].gps.lat/10000000,5));
                 display.drawString (128, line + 10, String((float)peers[i].gps.lon/10000000,5));
@@ -344,8 +349,9 @@ void msp_set_name() {
     else {
         for (int i = 0; i < LORA_NAME_LENGTH; i++) {
             curr.name[i] = (char) random(65, 90);
+            curr.name[LORA_NAME_LENGTH] = 0;
         }
-        curr.name[LORA_NAME_LENGTH] = 0;
+        
     }
 }
 
@@ -569,7 +575,7 @@ void loop() {
             peerout.lon = curr.gps.lon;
             peerout.alt = curr.gps.alt;
             peerout.speed = curr.gps.groundSpeed;
-            peerout.heading = curr.gps.groundCourse;
+            peerout.heading = curr.gps.groundCourse / 10;
         }
         else {
             peerout.lat = 0;
@@ -586,21 +592,23 @@ void loop() {
         lora_last_tx = millis();
         stats.last_tx_duration = lora_last_tx - stats.last_tx_begin;
 
-//        msp_step = 0;
-//        stats.last_msp_duration = 0;
-        //msp_next_cycle = lora_last_tx + LORA_CYCLE_SLOTSPACING / 2; // Begin sending MSP half a slot later
+        msp_step = 0;
+        stats.last_msp_duration = 0;
+        msp_next_cycle = stats.last_tx_begin + LORA_CYCLE_SLOTSPACING / 2; // Begin sending MSP half a slot later
 
         // Drift correction
 
-        if (peers[curr.id].id > 1 && peers[curr.id - 1].id > 0) {
+        if ((curr.id > 1) && (peers[curr.id - 1].id > 0)) { 
             lora_drift = lora_last_tx - peers[curr.id - 1].updated - LORA_CYCLE_SLOTSPACING;
 
-            if ((abs(lora_drift) > LORA_CYCLE_ANTIDRIFT_THRESHOLD) && (abs(lora_drift) < LORA_CYCLE_SLOTSPACING * 0.5)) {
-                lora_next_tx += constrain(lora_drift, -LORA_CYCLE_ANTIDRIFT_CORRECTION, LORA_CYCLE_ANTIDRIFT_CORRECTION);
+            if ((abs(lora_drift) > LORA_CYCLE_ANTIDRIFT_THRESHOLD) && (abs(lora_drift) < (LORA_CYCLE_SLOTSPACING * 0.5))) {
+                drift_correction = constrain(lora_drift, -LORA_CYCLE_ANTIDRIFT_CORRECTION, LORA_CYCLE_ANTIDRIFT_CORRECTION);
+                lora_next_tx += drift_correction;
+                sprintf(sys_message, "%s %3d", "DRIFT:", drift_correction);
             }
         }
 
-
+/*
         if (curr.host != HOST_NONE) {
             stats.timer_begin = millis();
             msp_send_peers();
@@ -609,6 +617,7 @@ void loop() {
             stats.timer_end = millis();
             stats.last_msp_duration = stats.timer_end - stats.timer_begin;
         }
+*/
 
         // Back to RX
 
@@ -631,8 +640,8 @@ void loop() {
 // ---------------------- SERIAL / MSP
 
 
-/*
-    if ((millis() > msp_next_cycle && msp_step < 3 && (curr.host != HOST_NONE)) && (lora_mode > LORA_SYNC)) {
+
+    if (((millis() > msp_next_cycle) && (msp_step < 3) && (curr.host != HOST_NONE)) && (lora_mode > LORA_SYNC)) {
         stats.timer_begin = millis();
 
         switch (msp_step) {
@@ -660,7 +669,6 @@ void loop() {
         msp_next_cycle += MSP_CYCLE_DELAY;
         msp_step++;
     }
-*/
 
 
 // ---------------------- STATISTICS & IO
