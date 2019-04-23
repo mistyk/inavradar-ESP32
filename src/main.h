@@ -1,35 +1,17 @@
-#define VERSION "0.9"
+#define VERSION "0.91"
 
-#define LORA_INIT   0
-#define LORA_SYNC   1
-#define LORA_RX     2
-#define LORA_TX     3
-
-#define LORA_FREQUENCY 433E6 
-#define LORA_BANDWIDTH 250000
-#define LORA_CODING_RATE 5
-#define LORA_SPREADING_FACTOR 7
-#define LORA_POWER 20
-#define LORA_CYCLE 500 // ms
-#define LORA_CYCLE_SLOTSPACING 100 // ms
-#define LORA_CYCLE_TIMING_DELAY -16 // ms
-#define LORA_CYCLE_ANTIDRIFT_THRESHOLD 5 // ms
-#define LORA_CYCLE_ANTIDRIFT_CORRECTION 5 // ms
-#define MSP_CYCLE_DELAY 100 // ms
+#define MODE_HOST_SCAN   0
+#define MODE_LORA_INIT   1
+#define MODE_LORA_SYNC   2
+#define MODE_LORA_RX     3
+#define MODE_LORA_TX     4
 
 #define LORA_NAME_LENGTH 4
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
-#define CYCLE_SCAN 4000 // ms
-#define CYCLE_DISPLAY 125 // ms
-#define CYCLE_STATS 1000 // ms
-
 #define LORA_MAXPEERS 5
-
-#define LORA_PEER_TIMEOUT 5000 // ms
-#define SERIAL_FC_TIMEOUT 4000 // ms
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -48,7 +30,7 @@ struct peer_t {
    uint8_t id;
    uint8_t state;
    char name[LORA_NAME_LENGTH + 1];
-   uint8_t host;  
+   uint8_t host;
    uint8_t tick;
    uint32_t updated;
    int rssi;
@@ -69,27 +51,45 @@ struct peer_air_t {
     uint8_t id;
     uint8_t host;
     uint8_t tick;
-    int32_t lat; 
+    int32_t lat;
     int32_t lon;
-    int16_t alt; 
-    int16_t speed;  
-    int16_t heading; 
+    int16_t alt;
+    int16_t speed;
+    int16_t heading;
     char name[LORA_NAME_LENGTH];
 };
 
 struct stats_t {
     uint32_t timer_begin;
-    uint32_t timer_end;    
+    uint32_t timer_end;
     float packets_total;
     uint32_t packets_received;
     uint8_t percent_received;
     uint16_t last_tx_begin;
     uint16_t last_tx_duration;
     uint16_t last_rx_duration;
-    uint16_t last_msp_duration;
+    uint16_t last_msp_tx_duration;
+    uint16_t last_msp_rx_duration;
     uint16_t last_oled_duration;
 };
 
+struct config_t {
+    uint32_t lora_frequency;
+    uint32_t lora_bandwidth;
+    uint8_t lora_coding_rate;
+    uint8_t lora_spreading_factor;
+    uint8_t lora_power;
+    uint16_t lora_cycle;
+    uint16_t lora_slot_spacing;
+    int16_t lora_timing_delay;
+    uint8_t lora_antidrift_threshold;
+    uint8_t lora_antidrift_correction;
+    uint16_t lora_peer_timeout;
 
+    uint16_t msp_cycle_delay;
+    uint16_t msp_fc_timeout;
 
-
+    uint16_t cycle_scan;
+    uint16_t cycle_display;
+    uint16_t cycle_stats;
+};

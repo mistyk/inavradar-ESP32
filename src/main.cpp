@@ -11,15 +11,17 @@
 
 SSD1306 display(0x3c, 4, 15);
 
+config_t cfg;
+MSP msp;
+
 curr_t curr; // Our peer
 peer_t peers[LORA_MAXPEERS]; // Other peers
 peer_air_t incoming; // Received peer
 peer_air_t peerout; // Sent peer
 
-MSP msp;
 stats_t stats;
 int sys_rssi;
-uint8_t lora_mode;
+uint8_t main_mode;
 uint8_t last_received_id = 0;
 char sys_message[20];
 
@@ -42,7 +44,6 @@ bool display_enabled = 1;
 uint32_t cycle_scan_begin;
 uint32_t last_tx_begin;
 uint32_t last_tx_end;
-uint32_t lora_origin = 0;
 uint32_t lora_last_tx = 0;
 uint32_t lora_next_tx = 0;
 uint32_t lora_last_rx = 0;
@@ -54,7 +55,67 @@ uint32_t display_updated = 0;
 uint32_t now = 0;
 int drift_correction = 0;
 
+// -------- SYSTEM
 
+void set_mode(uint8_t mode) {
+
+    switch (mode) {
+
+    case 0 :
+        cfg.lora_frequency = 433E6;
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 5;
+        cfg.lora_spreading_factor = 8;
+        cfg.lora_power = 20;
+        cfg.lora_cycle = 500;
+        cfg.lora_slot_spacing = 100;
+        cfg.lora_timing_delay = -60;
+        cfg.lora_antidrift_threshold = 5;
+        cfg.lora_antidrift_correction = 5;
+        cfg.lora_peer_timeout = 5000;
+
+        cfg.msp_cycle_delay = 100;
+        cfg.msp_fc_timeout = 7000;
+
+        cfg.cycle_scan = 4000;
+        cfg.cycle_display = 125;
+        cfg.cycle_stats = 1000;
+
+        break;
+    }
+}
+
+int count_peers() {
+    int j = 0;
+    for (int i = 0; i < LORA_MAXPEERS; i++) {
+        if (peers[i].id > 0) {
+            j++;
+        }
+    }
+    return j;
+}
+
+void pick_id() {
+    curr.id = 0;
+    for (int i = 0; i < LORA_MAXPEERS; i++) {
+        if ((peers[i].id == 0) && (curr.id == 0)) {
+            curr.id = i + 1;
+            peerout.id = curr.id;
+        }
+    }
+}
+
+void resync_tx_slot(int16_t delay) { 
+    bool startnow = 0;
+    for (int i = 0; (i < LORA_MAXPEERS) && (startnow == 0); i++) { // Resync
+        if (peers[i].id > 0) {
+            lora_next_tx = peers[i].updated + (curr.id - peers[i].id) * cfg.lora_slot_spacing + cfg.lora_cycle + delay;
+            startnow = 1;
+        }
+    }
+}
+
+        
 // -------- LoRa
 
 void lora_send(peer_air_t *outgoing) {
@@ -65,7 +126,7 @@ void lora_send(peer_air_t *outgoing) {
 
 }
 
-void onReceive(int packetSize) {
+void lora_receive(int packetSize) {
 
     if (packetSize == 0) return;
     lora_last_rx = millis();
@@ -76,9 +137,6 @@ void onReceive(int packetSize) {
 
     uint8_t id = incoming.id - 1;
 
-//  if (String(incoming.name) != String(peers[id].name)) { // Something wrong, id slot / name mismatch
-//      peers[incoming.id].state = 3;
-//  }
 
     peers[id].id = incoming.id;
     last_received_id = incoming.id;
@@ -100,6 +158,16 @@ void onReceive(int packetSize) {
 
     stats.timer_end = millis();
     stats.last_rx_duration = stats.timer_end - lora_last_rx;
+
+    if (incoming.id == curr.id) { // Same slot, conflict
+        uint32_t cs1 = incoming.name[0] + incoming.name[1] * 26 + incoming.name[2] * 26 * 26 ;
+        uint32_t cs2 = curr.name[0] + curr.name[1] * 26 + curr.name[2] * 26 * 26; 
+        if (cs1 < cs2) { // Pick another slot
+            sprintf(sys_message, "%s", "ID CONFLICT");
+            pick_id();
+            resync_tx_slot(cfg.lora_timing_delay);
+        }
+    }
 }
 
 void lora_init() {
@@ -107,19 +175,19 @@ void lora_init() {
     SPI.begin(5, 19, 27, 18);
     LoRa.setPins(SS, RST, DI0);
 
-    if (!LoRa.begin(LORA_FREQUENCY)) {
+    if (!LoRa.begin(cfg.lora_frequency)) {
         display.drawString (94, 9, "FAIL");
         while (1);
     }
 
     LoRa.sleep();
-    LoRa.setSignalBandwidth(LORA_BANDWIDTH);
-    LoRa.setCodingRate4(LORA_CODING_RATE);
-    LoRa.setSpreadingFactor(LORA_SPREADING_FACTOR);
-    LoRa.setTxPower(LORA_POWER, 1);
+    LoRa.setSignalBandwidth(cfg.lora_bandwidth);
+    LoRa.setCodingRate4(cfg.lora_coding_rate);
+    LoRa.setSpreadingFactor(cfg.lora_spreading_factor);
+    LoRa.setTxPower(cfg.lora_power, 1);
     LoRa.setOCP(250);
     LoRa.idle();
-    LoRa.onReceive(onReceive);
+    LoRa.onReceive(lora_receive);
     LoRa.enableCrc();
 }
 
@@ -202,12 +270,62 @@ void display_draw() {
 
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
+
+        display.drawString(0, 0, "HOST:");
+        display.drawString(0, 10, "GPS LAT");
+        display.drawString(0, 20, "GPS LON");
+        display.drawString(0, 30, "GPS ALT");
+        display.drawString(0, 40, "TICK");
+        display.drawString (32, 0, String(curr.name));
+        display.drawString (96, 0, String(host_name[curr.host]));
+
+        display.setTextAlignment(TEXT_ALIGN_RIGHT);
+        display.drawString (120, 10, String((float)curr.gps.lat/10000000, 6));
+        display.drawString (120, 20, String((float)curr.gps.lon/10000000, 6));
+        display.drawString (120, 30, String((float)curr.gps.alt));
+        display.drawString (120, 40, String(peerout.tick));
+
+    }
+
+    else if (sys_display_page == 2) {
+
+        display.setFont (ArialMT_Plain_10);
+        display.setTextAlignment (TEXT_ALIGN_LEFT);
+
+        int j = 0;
+        for (int i = 0; i < LORA_MAXPEERS ; i++) {
+            if (peers[i].id > 0 && j < 3) {
+                line = j * 20;
+                display.setTextAlignment (TEXT_ALIGN_LEFT);
+                display.drawString (0, line, String(peers[i].id) + ":");
+                display.drawString (13, line, String(peers[i].name));
+                display.drawString (50, line, String(host_name[peers[i].host]));
+                display.drawString (13, line + 10, "LQ " + String(peers[i].rssi));
+                display.drawString (50, line + 10, String(peers[i].tick));
+//                display.drawString (13, line + 20, "S:" + String(peers[i].gps.groundSpeed));
+//                display.drawString (80, line + 20, "H:" + String(peers[i].gps.groundCourse / 10));
+
+                display.setTextAlignment (TEXT_ALIGN_RIGHT);
+                display.drawString (128, line, String((float)peers[i].gps.lat/10000000,5));
+                display.drawString (128, line + 10, String((float)peers[i].gps.lon/10000000,5));
+
+                j++;
+            }
+        }
+        if (j == 0) {
+            display.drawString (0, 0, "NO PEER DETECTED");
+        }
+    }
+    else if (sys_display_page == 3) {
+
+        display.setFont (ArialMT_Plain_10);
+        display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawString (0, 1 , "_____________________");
         display.drawString (3, 4 , ".");
         display.drawString (60, 4 , ".");
         display.drawString (122, 4 , ".");
-        display.drawString (0, 14 , String(LORA_CYCLE));
-        display.drawString (52, 14 , String(LORA_CYCLE / 2));
+        display.drawString (0, 14 , String(cfg.lora_cycle));
+        display.drawString (52, 14 , String(cfg.lora_cycle / 2));
         display.drawString (120, 14 , "0");
 
         long pos[LORA_MAXPEERS];
@@ -217,8 +335,8 @@ void display_draw() {
         for (int i = 0; i < LORA_MAXPEERS ; i++) {
             if (peers[i].id != 0) {
                 diff = now - peers[i].updated;
-                if ( diff < LORA_CYCLE) {
-                    pos[i] = 120 - 120 * diff / LORA_CYCLE;
+                if ( diff < cfg.lora_cycle) {
+                    pos[i] = 120 - 120 * diff / cfg.lora_cycle;
                 }
             }
             else {
@@ -227,8 +345,8 @@ void display_draw() {
         }
 
         diff = now - lora_last_tx;
-        if ( diff < LORA_CYCLE) {
-            display.drawString (120 - 120 * diff / LORA_CYCLE, 0, String(curr.id));
+        if ( diff < cfg.lora_cycle) {
+            display.drawString (120 - 120 * diff / cfg.lora_cycle, 0, String(curr.id));
         }
 
         for (int i = 0; i < LORA_MAXPEERS ; i++) {
@@ -255,78 +373,34 @@ void display_draw() {
             j++;
             }
         }
-    }
 
-    else if (sys_display_page == 2) {
-
+     }
+    else if (sys_display_page == 4) {
+        stats.last_rx_duration = cfg.lora_cycle - stats.last_tx_duration - stats.last_msp_tx_duration - stats.last_msp_rx_duration - stats.last_oled_duration * cfg.lora_cycle / cfg.cycle_display;
+    
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawString(0, 0, "TX TIME");
-//        display.drawString(0, 10, "RX TIME");
-        display.drawString(0, 10, "MSP TIME");
-        display.drawString(0, 20, "OLED TIME");
-        display.drawString(0, 30, "LORA CYCLE");
-
+        display.drawString(0, 10, "MSP TX TIME");
+        display.drawString(0, 20, "MSP RX TIME");
+        display.drawString(0, 30, "OLED TIME");
+        display.drawString(0, 40, "RX+IDLE TIME");
+        display.drawString(0, 50, "LORA CYCLE");
+        
         display.drawString(112, 0, "ms");
         display.drawString(112, 10, "ms");
         display.drawString(112, 20, "ms");
         display.drawString(112, 30, "ms");
-//        display.drawString(112, 40, "ms");
-
+        display.drawString(112, 40, "ms");
+        display.drawString(112, 50, "ms");
+        
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
         display.drawString (111, 0, String(stats.last_tx_duration));
-        // display.drawString (111, 10, String(stats.last_rx_duration));
-//        display.drawString (111, 10, "--");
-        display.drawString (111, 10, String(stats.last_msp_duration));
-        display.drawString (111, 20, String(stats.last_oled_duration));
-        display.drawString (111, 30, String(LORA_CYCLE));
-
-        }
-
-    else if (sys_display_page == 3) {
-        display.setFont (ArialMT_Plain_10);
-        display.setTextAlignment (TEXT_ALIGN_LEFT);
-
-
-        display.drawString(0, 0, "HOST:");
-        display.drawString(0, 10, "GPS LAT");
-        display.drawString(0, 20, "GPS LON");
-        display.drawString(0, 30, "GPS ALT");
-        display.drawString(0, 40, "TICK");
-
-        display.drawString (32, 0, String(curr.name));
-        display.drawString (96, 0, String(host_name[curr.host]));
-
-        display.setTextAlignment(TEXT_ALIGN_RIGHT);
-        display.drawString (120, 10, String((float)curr.gps.lat/10000000, 6));
-        display.drawString (120, 20, String((float)curr.gps.lon/10000000, 6));
-        display.drawString (120, 30, String((float)curr.gps.alt));
-        display.drawString (120, 40, String(peerout.tick));
-     }
-    else if (sys_display_page == 4) {
-        display.setFont (ArialMT_Plain_10);
-        display.setTextAlignment (TEXT_ALIGN_LEFT);
-
-        int j = 0;
-        for (int i = 0; i < LORA_MAXPEERS ; i++) {
-            if (peers[i].id > 0 && j < 2) {
-                line = j * 30;
-                display.setTextAlignment (TEXT_ALIGN_LEFT);
-                display.drawString (0, line, String(peers[i].id) + ":");
-                display.drawString (13, line, String(peers[i].name));
-                display.drawString (50, line, String(host_name[peers[i].host]));
-                display.drawString (13, line + 10, "LQ " + String(peers[i].rssi));
-                display.drawString (50, line + 10, String(peers[i].tick));
-                display.drawString (13, line + 20, "S:" + String(peers[i].gps.groundSpeed));
-                display.drawString (80, line + 20, "H:" + String(peers[i].gps.groundCourse / 10));
-                
-                display.setTextAlignment (TEXT_ALIGN_RIGHT);
-                display.drawString (128, line, String((float)peers[i].gps.lat/10000000,5));
-                display.drawString (128, line + 10, String((float)peers[i].gps.lon/10000000,5));
-
-                j++;
-            }
-        }
+        display.drawString (111, 10, String(stats.last_msp_tx_duration));
+        display.drawString (111, 20, String(stats.last_msp_rx_duration));
+        display.drawString (111, 30, String(stats.last_oled_duration));
+        display.drawString (111, 40, String(stats.last_rx_duration));
+        display.drawString (111, 50, String(cfg.lora_cycle));
     }
     last_received_id = 0;
     sys_message[0] = 0;
@@ -343,16 +417,7 @@ void msp_set_state() {
 }
 
 void msp_set_name() {
-    if (msp.request(MSP_NAME, &curr.name, sizeof(curr.name))) {
-    //
-    }
-    else {
-        for (int i = 0; i < LORA_NAME_LENGTH; i++) {
-            curr.name[i] = (char) random(65, 90);
-            curr.name[LORA_NAME_LENGTH] = 0;
-        }
-        
-    }
+    msp.request(MSP_NAME, &curr.name, sizeof(curr.name));
 }
 
 void msp_set_fc() {
@@ -413,21 +478,12 @@ void IRAM_ATTR handleInterrupt() {
     portEXIT_CRITICAL_ISR(&mux);
 }
 
-// -------- SYSTEM
-
-int count_peers() {
-    int j = 0;
-    for (int i = 0; i < LORA_MAXPEERS; i++) {
-        if (peers[i].id > 0) {
-            j++;
-        }
-    }
-    return j;
-}
 
 // -----------------------------
 
 void setup() {
+
+    set_mode(0);
 
     display_init();
 
@@ -448,46 +504,28 @@ void setup() {
     display.drawString (90, 18, "OK");
     display.display();
 
-    display.drawString (0, 27, "HOST");
-    display.display();
-    delay(SERIAL_FC_TIMEOUT);
-    msp_set_name();
-    msp_set_fc();
-    display.drawString (90, 27, String(host_name[curr.host]));
-    display.display();
+    for (int i = 0; i < LORA_MAXPEERS; i++) {
+        peers[i].id = 0;
+    }
 
     pinMode(interruptPin, INPUT);
     io_button_pressed = 0;
     attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
-    display.drawString (0, 38, "SCAN");
+    display.drawString (0, 27, "HOST");
     display.display();
-
-    for (int i = 0; i < LORA_MAXPEERS; i++) {
-        peers[i].id = 0;
-    }
-
-    curr.id = 0;
-    strncpy(peerout.name, curr.name, LORA_NAME_LENGTH);
-    peerout.host = curr.host;
-    curr.gps.fixType = 0;
-    curr.gps.lat = 0;
-    curr.gps.lon = 0;
-    curr.gps.alt = 0;
-    
-    LoRa.sleep();
-    LoRa.receive();
 
     display_updated = 0;
     cycle_scan_begin = millis();
 
-    lora_mode = LORA_INIT;
+    curr.host = HOST_NONE;
+
+    main_mode = MODE_HOST_SCAN;
 }
 
 // ----------------------------------------------------------------------------- MAIN LOOP
 
 void loop() {
-
 
 // ---------------------- IO BUTTON
 
@@ -495,56 +533,87 @@ void loop() {
         io_button_pressed = 0;
     }
 
-// ---------------------- LORA INIT
+// ---------------------- HOST SCAN
 
-    if (lora_mode == LORA_INIT) {
-        if (millis() > (cycle_scan_begin + CYCLE_SCAN)) {  // End of the scan, set the ID then sync
-            for (int i = 0; i < LORA_MAXPEERS; i++) {
-                if ((peers[i].id == 0)) {
-                    if (curr.id == 0) {
-                        curr.id = i + 1;
-                        peerout.id = curr.id;
-                    }
+    if (main_mode == MODE_HOST_SCAN) {
+            if ((millis() > (cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
+
+            if (curr.host != HOST_NONE) {
+                msp_set_name();
+            }
+            else {
+                for (int i = 0; i < LORA_NAME_LENGTH; i++) {
+                curr.name[i] = (char) random(65, 90);
+                curr.name[LORA_NAME_LENGTH] = 0;
                 }
             }
-            lora_mode = LORA_SYNC;
+
+            strncpy(peerout.name, curr.name, LORA_NAME_LENGTH);
+            peerout.host = curr.host;
+            curr.gps.fixType = 0;
+            curr.gps.lat = 0;
+            curr.gps.lon = 0;
+            curr.gps.alt = 0;
+            curr.id = 0;
+
+            display.drawString (90, 27, String(host_name[curr.host]));
+            display.drawString (0, 38, "SCAN");
+            display.display();
+
+            LoRa.sleep();
+            LoRa.receive();
+
+            cycle_scan_begin = millis();
+            main_mode = MODE_LORA_INIT;
+
         } else { // Still scanning
-            if ((millis() > display_updated + CYCLE_DISPLAY) && display_enabled) {
-                for (int i = 0; i < LORA_MAXPEERS; i++) {
-                    if (peers[i].id > 0) {
-                        display.drawString(40 + peers[i].id * 8, 38, String(peers[i].id));
-                    }
-                }
-                display.drawProgressBar(00, 53, 126, 7, 100 * (millis() - cycle_scan_begin) / CYCLE_SCAN);
+            if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
+
+                delay(cfg.cycle_display / 2);
+                msp_set_fc();
+
+                display.drawProgressBar(35, 30, 48, 6, 100 * (millis() - cycle_scan_begin) / cfg.msp_fc_timeout);
                 display.display();
                 display_updated = millis();
             }
         }
     }
 
-// ---------------------- LORA START
+// ---------------------- LORA INIT
 
-    if (lora_mode == LORA_SYNC) {
+    if (main_mode == MODE_LORA_INIT) {
+        if (millis() > (cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
+            pick_id();
+            main_mode = MODE_LORA_SYNC;
+        } else { // Still scanning
+            if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
+                for (int i = 0; i < LORA_MAXPEERS; i++) {
+                    if (peers[i].id > 0) {
+                        display.drawString(40 + peers[i].id * 8, 38, String(peers[i].id));
+                    }
+                }
+                display.drawProgressBar(0, 53, 126, 6, 100 * (millis() - cycle_scan_begin) / cfg.cycle_scan);
+                display.display();
+                display_updated = millis();
+            }
+        }
+    }
+
+// ---------------------- LORA SYNC
+
+    if (main_mode == MODE_LORA_SYNC) {
 
         sys_num_peers = count_peers();
-        lora_origin = millis();
 
         if (sys_num_peers == 0) { // Alone, start at will
-            lora_next_tx = lora_origin + LORA_CYCLE;
+            lora_next_tx = millis() + cfg.lora_cycle;
             }
         else { // Not alone, sync by slot
-
-            bool startnow = 0;
-            for (int i = 0; (i < LORA_MAXPEERS) && (startnow == 0); i++) {
-                if (peers[i].id > 0) {
-                   lora_next_tx = peers[i].updated + (curr.id - peers[i].id) * LORA_CYCLE_SLOTSPACING + LORA_CYCLE + LORA_CYCLE_TIMING_DELAY;
-                   startnow = 1;
-                }
-            }
-
+            resync_tx_slot(cfg.lora_timing_delay);
         }
         display_updated = millis();
         stats_updated = millis();
+
         sys_pps = 0;
         sys_ppsc = 0;
         sys_num_peers = 0;
@@ -552,23 +621,24 @@ void loop() {
         stats.packets_received = 0;
         stats.percent_received = 0;
         peerout.tick = 0;
-        lora_mode = LORA_RX;
+
+        main_mode = MODE_LORA_RX;
         }
 
 // ---------------------- LORA RX
 
-    if ((lora_mode == LORA_RX) && (millis() > lora_next_tx)) {
+    if ((main_mode == MODE_LORA_RX) && (millis() > lora_next_tx)) {
         now = millis();
 
         while (now > lora_next_tx) { // In  case we skipped some beats
-           lora_next_tx += LORA_CYCLE;
+           lora_next_tx += cfg.lora_cycle;
         }
-        lora_mode = LORA_TX;
+        main_mode = MODE_LORA_TX;
     }
 
 // ---------------------- LORA TX
 
-    if (lora_mode == LORA_TX) {
+    if (main_mode == MODE_LORA_TX) {
 
         if ((curr.host != HOST_NONE) && (curr.gps.fixType > 0)) {
             peerout.lat = curr.gps.lat;
@@ -584,7 +654,7 @@ void loop() {
             peerout.speed = 0;
             peerout.heading = 0;
         }
-        
+
         peerout.tick++;
 
         stats.last_tx_begin = millis();
@@ -592,43 +662,31 @@ void loop() {
         lora_last_tx = millis();
         stats.last_tx_duration = lora_last_tx - stats.last_tx_begin;
 
-        msp_step = 0;
-        stats.last_msp_duration = 0;
-        msp_next_cycle = stats.last_tx_begin + LORA_CYCLE_SLOTSPACING / 2; // Begin sending MSP half a slot later
-
         // Drift correction
 
-        if ((curr.id > 1) && (peers[curr.id - 1].id > 0)) { 
-            lora_drift = lora_last_tx - peers[curr.id - 1].updated - LORA_CYCLE_SLOTSPACING;
+        if ((curr.id > 1) && (peers[curr.id - 1].id > 0)) {
+            lora_drift = lora_last_tx - peers[curr.id - 1].updated - cfg.lora_slot_spacing;
 
-            if ((abs(lora_drift) > LORA_CYCLE_ANTIDRIFT_THRESHOLD) && (abs(lora_drift) < (LORA_CYCLE_SLOTSPACING * 0.5))) {
-                drift_correction = constrain(lora_drift, -LORA_CYCLE_ANTIDRIFT_CORRECTION, LORA_CYCLE_ANTIDRIFT_CORRECTION);
+            if ((abs(lora_drift) > cfg.lora_antidrift_threshold) && (abs(lora_drift) < (cfg.lora_slot_spacing * 0.5))) {
+                drift_correction = constrain(lora_drift, -cfg.lora_antidrift_correction, cfg.lora_antidrift_correction);
                 lora_next_tx += drift_correction;
                 sprintf(sys_message, "%s %3d", "DRIFT:", drift_correction);
             }
         }
 
-/*
-        if (curr.host != HOST_NONE) {
-            stats.timer_begin = millis();
-            msp_send_peers();
-            msp.request(MSP_RAW_GPS, &curr.gps, sizeof(curr.gps));
-            msp_set_state();
-            stats.timer_end = millis();
-            stats.last_msp_duration = stats.timer_end - stats.timer_begin;
-        }
-*/
+        msp_step = 0;
+        msp_next_cycle = stats.last_tx_begin + cfg.lora_slot_spacing * 2.5;
 
         // Back to RX
 
         LoRa.sleep();
         LoRa.receive();
-        lora_mode = LORA_RX;
+        main_mode = MODE_LORA_RX;
     }
 
 // ---------------------- DISPLAY
 
-    if ((millis() > display_updated + CYCLE_DISPLAY) && display_enabled && (lora_mode > LORA_SYNC)) {
+    if ((millis() > display_updated + cfg.cycle_display) && display_enabled && (main_mode > MODE_LORA_SYNC)) {
 
         stats.timer_begin = millis();
         display_draw();
@@ -640,40 +698,38 @@ void loop() {
 // ---------------------- SERIAL / MSP
 
 
-
-    if (((millis() > msp_next_cycle) && (msp_step < 3) && (curr.host != HOST_NONE)) && (lora_mode > LORA_SYNC)) {
-        stats.timer_begin = millis();
+    if (((millis() > msp_next_cycle) && (msp_step < 3) && (curr.host != HOST_NONE)) && (main_mode > MODE_LORA_SYNC)) {
 
         switch (msp_step) {
 
         case 0:
-            msp_send_peers();
+            msp_set_state();
             break;
 
         case 1:
+            stats.timer_begin = millis();
             msp.request(MSP_RAW_GPS, &curr.gps, sizeof(curr.gps));
+            stats.timer_end = millis();
+            stats.last_msp_rx_duration = stats.timer_end - stats.timer_begin;
             break;
 
         case 2:
-            msp_set_state();
-//          if (display_enabled == 1) {
-//              msp.request(MSP_ANALOG, &curr.vbat, sizeof(curr.vbat));
-//          }
+            stats.timer_begin = millis();
+            msp_send_peers();
+            stats.timer_end = millis();
+            stats.last_msp_tx_duration = stats.timer_end - stats.timer_begin;
             break;
 
         }
 
-        stats.timer_end = millis();
-        stats.last_msp_duration += stats.timer_end - stats.timer_begin;
-
-        msp_next_cycle += MSP_CYCLE_DELAY;
+        msp_next_cycle += cfg.msp_cycle_delay;
         msp_step++;
     }
 
 
 // ---------------------- STATISTICS & IO
 
-    if ((millis() > (CYCLE_STATS + stats_updated)) && (lora_mode > LORA_SYNC)) {
+    if ((millis() > (cfg.cycle_stats + stats_updated)) && (main_mode > MODE_LORA_SYNC)) {
 
         sys_pps = sys_ppsc;
         sys_ppsc = 0;
@@ -682,7 +738,7 @@ void loop() {
         // Pruning the timed-out peers
 
         for (int i = 0; i < LORA_MAXPEERS; i++) {
-            if (peers[i].id > 0 && ((now - peers[i].updated) > LORA_PEER_TIMEOUT)) {
+            if (peers[i].id > 0 && ((now - peers[i].updated) > cfg.lora_peer_timeout)) {
                 peers[i].state = 0;
                 peers[i].id = 0;
                 sys_rssi = 0;
@@ -690,7 +746,7 @@ void loop() {
         }
 
         sys_num_peers = count_peers();
-        stats.packets_total += sys_num_peers * CYCLE_STATS / LORA_CYCLE;
+        stats.packets_total += sys_num_peers * cfg.cycle_stats / cfg.lora_cycle;
         stats.packets_received += sys_pps;
         stats.percent_received = (stats.packets_received > 0) ? constrain(100 * stats.packets_received / stats.packets_total, 0 ,100) : 0;
 
