@@ -6,12 +6,13 @@
 #define MODE_LORA_RX     3
 #define MODE_LORA_TX     4
 
-#define LORA_NAME_LENGTH 4
+#define LORA_NAME_LENGTH 7
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
-#define LORA_MAXPEERS 5
+#define LORA_NODES 4
+#define LORA_PERF_MODE 0
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -24,17 +25,23 @@
 #define HOST_INAV 1
 #define HOST_BTFL 2
 
+
+
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
+char host_state[3][5]={"IDLE", "1", "2"};
 
 struct peer_t {
    uint8_t id;
-   uint8_t state;
-   char name[LORA_NAME_LENGTH + 1];
    uint8_t host;
-   uint8_t tick;
+   uint8_t state;
+   uint8_t broadcast;
    uint32_t updated;
+   uint32_t lq_updated;
+   uint8_t lq_tick;
+   uint8_t lq;
    int rssi;
    msp_raw_gps_t gps;
+   char name[LORA_NAME_LENGTH + 1];
    };
 
 struct curr_t {
@@ -47,17 +54,25 @@ struct curr_t {
     msp_analog_t vbat;
 };
 
-struct peer_air_t {
-    uint8_t id;
-    uint8_t host;
-    uint8_t tick;
-    int32_t lat;
-    int32_t lon;
-    int16_t alt;
-    int16_t speed;
-    int16_t heading;
-    char name[LORA_NAME_LENGTH];
+
+struct air_type0_t { // 80 bits
+    unsigned int id : 3;
+	unsigned int type : 3;
+    signed int lat : 25; // -9 000 000 to +9 000 000
+    signed int lon : 26; // -18 000 000 to +18 000 000
+    signed int alt : 14; // -8192m to +8192m
+    unsigned int heading : 9;
 };
+
+struct air_type1_t { // 80 bits
+    unsigned int id : 3;
+	unsigned int type : 3;
+    unsigned int host : 3;
+    unsigned int state : 3;
+    unsigned int broadcast : 6;
+    unsigned int speed : 6; // 64m/s
+    char name[LORA_NAME_LENGTH]; // 7x8
+	};
 
 struct stats_t {
     uint32_t timer_begin;
@@ -86,10 +101,11 @@ struct config_t {
     uint8_t lora_antidrift_correction;
     uint16_t lora_peer_timeout;
 
-    uint16_t msp_cycle_delay;
     uint16_t msp_fc_timeout;
-
+    uint16_t msp_after_tx_delay;
+    
     uint16_t cycle_scan;
     uint16_t cycle_display;
     uint16_t cycle_stats;
 };
+
