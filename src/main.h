@@ -1,4 +1,4 @@
-#define VERSION "0.91"
+#define VERSION "0.92"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -25,10 +25,9 @@
 #define HOST_INAV 1
 #define HOST_BTFL 2
 
-
-
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
-char host_state[3][5]={"IDLE", "1", "2"};
+char host_state[3][5]={"IDLE", "ARM", ""};
+char peer_slotname[9][3]={"", "A", "B", "C", "D", "E", "F", "G", "H"};
 
 struct peer_t {
    uint8_t id;
@@ -41,6 +40,7 @@ struct peer_t {
    uint8_t lq;
    int rssi;
    msp_raw_gps_t gps;
+   msp_raw_gps_t gpsrec;   
    char name[LORA_NAME_LENGTH + 1];
    };
 
@@ -53,7 +53,6 @@ struct curr_t {
     msp_raw_gps_t gps;
     msp_analog_t vbat;
 };
-
 
 struct air_type0_t { // 80 bits
     unsigned int id : 3;
@@ -75,6 +74,7 @@ struct air_type1_t { // 80 bits
 	};
 
 struct stats_t {
+    uint32_t up_time_begin;
     uint32_t timer_begin;
     uint32_t timer_end;
     float packets_total;
@@ -108,4 +108,49 @@ struct config_t {
     uint16_t cycle_display;
     uint16_t cycle_stats;
 };
+
+const uint8_t icon_lq_1[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000011
+};
+
+const uint8_t icon_lq_2[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00001111,
+    B00000000,
+    B00000011
+};
+
+const uint8_t icon_lq_3[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00111111,
+    B00000000,
+    B00001111,
+    B00000000,
+    B00000011
+};
+
+const uint8_t icon_lq_4[] PROGMEM = {
+    B00000000,
+    B11111111,
+    B00000000,
+    B00111111,
+    B00000000,
+    B00001111,
+    B00000000,
+    B00000011
+};
+
 
