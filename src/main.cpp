@@ -23,6 +23,7 @@ air_type1_t * air_r;
 stats_t stats;
 int sys_rssi;
 uint8_t main_mode;
+bool silent_mode = 0;
 uint8_t last_received_id = 0;
 char sys_message[20];
 
@@ -634,9 +635,9 @@ void loop() {
         } else { // Still scanning
             if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
 
-                delay(cfg.cycle_display / 2);
+                delay(100);
                 msp_set_fc();
-
+     
                 display.drawProgressBar(35, 30, 48, 6, 100 * (millis() - cycle_scan_begin) / cfg.msp_fc_timeout);
                 display.display();
                 display_updated = millis();
@@ -648,8 +649,17 @@ void loop() {
 
     if (main_mode == MODE_LORA_INIT) {
         if (millis() > (cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
-            pick_id();
-            main_mode = MODE_LORA_SYNC;
+            
+            sys_num_peers = count_peers();
+            
+            if (sys_num_peers >= LORA_NODES) {
+                silent_mode = 1;
+            }
+            else {
+                pick_id();
+            }
+            main_mode = MODE_LORA_SYNC;            
+            
         } else { // Still scanning
             if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
                 for (int i = 0; i < LORA_NODES; i++) {
@@ -668,9 +678,7 @@ void loop() {
 
     if (main_mode == MODE_LORA_SYNC) {
 
-        sys_num_peers = count_peers();
-
-        if (sys_num_peers == 0) { // Alone, start at will
+        if (sys_num_peers == 0 || silent_mode) { // Alone or silent mode, start at will
             lora_next_tx = millis() + cfg.lora_cycle;
             }
         else { // Not alone, sync by slot
@@ -693,12 +701,20 @@ void loop() {
 // ---------------------- LORA RX
 
     if ((main_mode == MODE_LORA_RX) && (millis() > lora_next_tx)) {
+
         now = millis();
 
         while (now > lora_next_tx) { // In  case we skipped some beats
-           lora_next_tx += cfg.lora_cycle;
+            lora_next_tx += cfg.lora_cycle;
+            lora_last_tx = lora_next_tx;
         }
-        main_mode = MODE_LORA_TX;
+    
+        if (silent_mode) {
+            sprintf(sys_message, "%s", "SILENT MODE (NO TX)");
+        }
+        else {
+            main_mode = MODE_LORA_TX;
+        }
     }
 
 // ---------------------- LORA TX

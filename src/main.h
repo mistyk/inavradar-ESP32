@@ -27,7 +27,7 @@
 
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
 char host_state[3][5]={"IDLE", "ARM", ""};
-char peer_slotname[9][3]={"", "A", "B", "C", "D", "E", "F", "G", "H"};
+char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
 
 struct peer_t {
    uint8_t id;
