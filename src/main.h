@@ -1,4 +1,4 @@
-#define VERSION "0.92"
+#define VERSION "1.0"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
