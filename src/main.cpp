@@ -792,10 +792,12 @@ void loop() {
             break;
 
         case 2:
-            stats.timer_begin = millis();
-            msp_send_peers();
-            stats.timer_end = millis();
-            stats.last_msp_tx_duration = stats.timer_end - stats.timer_begin;
+            if (curr.host == HOST_INAV) {
+                stats.timer_begin = millis();
+                msp_send_peers();
+                stats.timer_end = millis();
+                stats.last_msp_tx_duration = stats.timer_end - stats.timer_begin;
+            }
             break;
 
         }
