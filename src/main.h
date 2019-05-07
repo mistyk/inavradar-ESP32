@@ -1,4 +1,4 @@
-#define VERSION "1.0"
+#define VERSION "1.01"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -39,8 +39,12 @@ struct peer_t {
    uint8_t lq_tick;
    uint8_t lq;
    int rssi;
+   uint16_t distance;
+   int16_t direction;
+   int16_t relalt;
    msp_raw_gps_t gps;
-   msp_raw_gps_t gpsrec;   
+   msp_raw_gps_t gpsrec;
+   msp_analog_t fcanalog;
    char name[LORA_NAME_LENGTH + 1];
    };
 
@@ -51,12 +55,12 @@ struct curr_t {
     char name[16];
     uint8_t tick;
     msp_raw_gps_t gps;
-    msp_analog_t vbat;
+    msp_analog_t fcanalog;
 };
 
 struct air_type0_t { // 80 bits
     unsigned int id : 3;
-	unsigned int type : 3;
+    unsigned int type : 3;
     signed int lat : 25; // -9 000 000 to +9 000 000
     signed int lon : 26; // -18 000 000 to +18 000 000
     signed int alt : 14; // -8192m to +8192m
@@ -65,13 +69,13 @@ struct air_type0_t { // 80 bits
 
 struct air_type1_t { // 80 bits
     unsigned int id : 3;
-	unsigned int type : 3;
+    unsigned int type : 3;
     unsigned int host : 3;
     unsigned int state : 3;
     unsigned int broadcast : 6;
     unsigned int speed : 6; // 64m/s
     char name[LORA_NAME_LENGTH]; // 7x8
-	};
+    };
 
 struct stats_t {
     uint32_t up_time_begin;
@@ -103,7 +107,7 @@ struct config_t {
 
     uint16_t msp_fc_timeout;
     uint16_t msp_after_tx_delay;
-    
+
     uint16_t cycle_scan;
     uint16_t cycle_display;
     uint16_t cycle_stats;
