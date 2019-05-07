@@ -4,15 +4,29 @@
 
 INAV-Radar is an addition to the [INAV](https://github.com/iNavFlight/inav) flight control software, it relays information about UAVs in the area to the flight controller for display on the OSD. INAV-Radar does this by using [LoRa](https://en.wikipedia.org/wiki/LoRa) radio to broadcast position, altitude, speed and plane name. It also listens for other UAVs so INAV OSD  can display this information as a HUD.
 
-![OSD]()
+![Video](https://www.youtube.com/watch?v=7ww0YOGN7F0)
 
 ## News
 
-Tests on aplha 7 look promising!
+We now have a RCgroups thread: [INAV-Radar on RCgroups](https://www.rcgroups.com/forums/showthread.php?3304673-iNav-Radar-ESP32-LoRa-modems)
+
+*** 1.01 (2019/05/06)
+
+- More detailled screens per nodes
+- Displays the local vbat and mAh. These datas are not yet transmitted to the other nodes.
+- Pressing the top button during the boot sequence will put the module in "silent" mode (ground-station), it will only receive, and won't transmit, thus freeing a slot. Button must be pressed at least once, between the time the module is plugged and the end of the SCAN progress bar.
+- No need to update iNav since 1.00, no changes.
+
+*** 1.00 (2019/04/25)
+
+- Initial release
+- Require iNav 2.2-dev, including the latest version for the Hud branch (build date 2019/04/27 or newer)
+- Cycle time 500ms, slotspacing 125ms, LoRA SF9 bw250, maximum 4 nodes (you + 3 others)
 
 If you feel brave engough to be a tester, just ask us in the Facebook group. [Contact](#contact)
 
 Thanks to Olivier we now have 'the HUD' it's nealy augmented reality!
+He also put a lot of work into the radio part!
 
 ## Index
 [Hardware](#hardware)
@@ -58,6 +72,8 @@ INAV-Radar is a experimental firmware based on INAV and is currently no part of 
 ## Testing
 
 For testing there is no need to install Atom and PlatformIO, just use the [esptool](https://github.com/espressif/esptool) for flashing.
+
+We are working on an easy installer! [still alpha stage](https://github.com/KingKone/INAV-Radar_Installer/releases)
 
 Your system needs the driver for the USB UART bridge:
 [Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
@@ -116,18 +132,22 @@ Backup your FC settings, flash the current [testing version of INAV](https://git
 
 Dump your backup back into the cli.
 
-Activate MSP on the corresponding UART, the speed is 57600.
+Activate MSP on the corresponding UART, the speed is 115200.
 
 OSD and HUD settings:
 ```
-osd_layout 0 2 0 0 V        // Crosshair and the HUD ON
-osd_layout 0 43 0 0 H       // north map OFF
-osd_layout 0 44 0 0 H       // takeoff map OFF
-osd_layout 0 45 0 0 H       // radar map OFF
-
-set osd_camera_uptilt = 0   // the HUD: camera angle
-set osd_camera_fov_h = 135  // the HUD: field of view horizontal
-set osd_camera_fov_v = 85   // the HUD: field of view vertical
+set osd_crosshairs_style = TYPE6
+set osd_horizon_offset = 0
+set osd_camera_uptilt = 0
+set osd_camera_fov_h = 135
+set osd_camera_fov_v = 85
+set osd_hud_margin_h = 1
+set osd_hud_margin_v = 3
+set osd_hud_homing = OFF
+set osd_hud_homepoint = ON
+set osd_hud_radar_disp = 4
+set osd_hud_radar_range_min = 1
+set osd_hud_radar_range_max = 4000
 ```
 
 Please also flash the extra Vision OSD fonts for signal strenth and the homing crosshair. Vision 1 is small/light, Vision 4 is heavy/bold.
@@ -137,6 +157,8 @@ The HUD has an entry in the stick menu (OSD->HUD) where you can change this conf
 Thanks for testing! 😄 👍
 
 ## Commands
+
+!!! COMMANDS ARE DISABLED IN CURRENT VERSION !!!
 
 If something is not working correctly, please open a serial terminal (Windows e.g. [PuTTy](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)).
 
@@ -172,5 +194,7 @@ mfp                     - Move fake plane
 ## Contact
 
 [Facebook Group](https://www.facebook.com/groups/360607501179901/)
+
+[INAV-Radar on RCgroups](https://www.rcgroups.com/forums/showthread.php?3304673-iNav-Radar-ESP32-LoRa-modems)
 
 [Patreon](https://www.patreon.com/inavradar)
