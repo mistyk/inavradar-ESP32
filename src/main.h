@@ -89,13 +89,11 @@ struct air_type2_t { // 80 bits
     };    
     
 struct stats_t {
-    uint32_t up_time_begin;
     uint32_t timer_begin;
     uint32_t timer_end;
     float packets_total;
     uint32_t packets_received;
     uint8_t percent_received;
-    uint16_t last_tx_begin;
     uint16_t last_tx_duration;
     uint16_t last_rx_duration;
     uint16_t last_msp_tx_duration;

@@ -49,18 +49,21 @@ bool display_enabled = 1;
 // Timing
 
 uint32_t cycle_scan_begin;
-uint32_t last_tx_begin;
-uint32_t last_tx_end;
 uint32_t lora_last_tx = 0;
-uint32_t lora_next_tx = 0;
 uint32_t lora_last_rx = 0;
+uint32_t lora_next_tx = 0;
+
 int32_t lora_drift = 0;
+int drift_correction = 0;
+
 uint32_t stats_updated = 0;
+
 uint32_t msp_next_cycle = 0;
 int msp_step = 0;
+
 uint32_t display_updated = 0;
 uint32_t now = 0;
-int drift_correction = 0;
+
 
 // -------- SYSTEM
 
@@ -82,7 +85,7 @@ void set_mode(uint8_t mode) {
         cfg.lora_peer_timeout = 6000;
 
         cfg.msp_fc_timeout = 7000;
-        cfg.msp_after_tx_delay = 85;
+        cfg.msp_after_tx_delay = 90;
 
         cfg.cycle_scan = 4000;
         cfg.cycle_display = 250;
@@ -176,11 +179,11 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
 
 void lora_send() {
 
-    sys_lora_sent++; // 255 mod 10 and 20 does not loop clean, todo
+    sys_lora_sent++; 
 
-    if (sys_lora_sent % 10 == 0) {
+    if (sys_lora_sent % 8 == 0) {
 
-        if (sys_lora_sent % 20 == 0) {
+        if (sys_lora_sent % 16 == 0) {
             air_2.id = curr.id;
             air_2.type = 2;
             air_2.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
@@ -299,7 +302,6 @@ void lora_init() {
     }
 
     LoRa.sleep();
-//  LoRa.setSignalBandwidth(cfg.lora_bandwidth, cfg.lora_frequency);
     LoRa.setSignalBandwidth(cfg.lora_bandwidth);
     LoRa.setCodingRate4(cfg.lora_coding_rate);
     LoRa.setSpreadingFactor(cfg.lora_spreading_factor);
@@ -437,12 +439,9 @@ void display_draw() {
             j++;
             }
         }
-
     }
 
     else if (sys_display_page == 2) {
-
-        stats.last_rx_duration = cfg.lora_cycle - stats.last_tx_duration - stats.last_msp_tx_duration - stats.last_msp_rx_duration - stats.last_oled_duration * cfg.lora_cycle / cfg.cycle_display;
 
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
@@ -567,9 +566,9 @@ void display_draw() {
                     display.drawString (88, 54, String((int)peers[i].fcanalog.mAhDrawn) + "mah");
                 }
                 
-                display.setTextAlignment (TEXT_ALIGN_RIGHT);
+            display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
-            }
+        }
         else {
             display.drawString (35, 7, "SLOT IS EMPTY");
         }
@@ -627,7 +626,8 @@ void msp_send_peers() {
             radarPos.heading = peers[i].gps.groundCourse;
             radarPos.speed = peers[i].gps.groundSpeed;
             radarPos.lq = peers[i].lq;
-            msp.commandv2(MSP2_COMMON_SET_RADAR_POS, &radarPos, sizeof(radarPos));
+           // msp.commandv2(MSP2_COMMON_SET_RADAR_POS, &radarPos, sizeof(radarPos));
+            msp.command(MSP_SET_RADAR_POS, &radarPos, sizeof(radarPos));
         }
     }
 }
@@ -694,16 +694,18 @@ void setup() {
 
 void loop() {
 
+    now = millis();
+
 // ---------------------- IO BUTTON
 
-    if ((millis() > io_button_released + 150) && (io_button_pressed == 1)) {
+    if ((now > io_button_released + 150) && (io_button_pressed == 1)) {
         io_button_pressed = 0;
     }
 
 // ---------------------- HOST SCAN
 
     if (main_mode == MODE_HOST_SCAN) {
-            if ((millis() > (cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
+            if ((now > (cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
 
             if (curr.host != HOST_NONE) {
                 msp_set_name();
@@ -732,9 +734,9 @@ void loop() {
             main_mode = MODE_LORA_INIT;
 
         } else { // Still scanning
-            if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
+            if ((now > display_updated + cfg.cycle_display / 2) && display_enabled) {
 
-                delay(100);
+                delay(50);
                 msp_set_fc();
 
                 display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - cycle_scan_begin) / cfg.msp_fc_timeout);
@@ -747,7 +749,7 @@ void loop() {
 // ---------------------- LORA INIT
 
     if (main_mode == MODE_LORA_INIT) {
-        if (millis() > (cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
+        if (now > (cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
 
             sys_num_peers = count_peers();
 
@@ -761,7 +763,7 @@ void loop() {
             main_mode = MODE_LORA_SYNC;
 
         } else { // Still scanning
-            if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
+            if ((now > display_updated + cfg.cycle_display / 2) && display_enabled) {
                 for (int i = 0; i < LORA_NODES; i++) {
                     if (peers[i].id > 0) {
                         display.drawString(40 + peers[i].id * 8, 18, String(peer_slotname[peers[i].id]));
@@ -793,20 +795,18 @@ void loop() {
         stats.packets_total = 0;
         stats.packets_received = 0;
         stats.percent_received = 0;
-        stats.up_time_begin = millis();
 
         main_mode = MODE_LORA_RX;
         }
 
 // ---------------------- LORA RX
 
-    if ((main_mode == MODE_LORA_RX) && (millis() > lora_next_tx)) {
+    if ((main_mode == MODE_LORA_RX) && (now > lora_next_tx)) {
 
-        now = millis();
-
+        // lora_last_tx = lora_next_tx;
+        
         while (now > lora_next_tx) { // In  case we skipped some beats
             lora_next_tx += cfg.lora_cycle;
-            lora_last_tx = lora_next_tx;
         }
 
         if (silent_mode) {
@@ -829,9 +829,6 @@ void loop() {
             curr.gps.groundSpeed = 0;
         }
 
-        // peerout.tick++;
-
-        // stats.last_tx_begin = millis();
         lora_last_tx = millis();
         lora_send();
         stats.timer_end = millis();
@@ -853,7 +850,7 @@ void loop() {
         }
 
         msp_step = 0;
-        msp_next_cycle = stats.last_tx_begin + cfg.msp_after_tx_delay;
+        msp_next_cycle = lora_last_tx + cfg.msp_after_tx_delay;
 
         // Back to RX
 
@@ -864,19 +861,19 @@ void loop() {
 
 // ---------------------- DISPLAY
 
-    if ((millis() > display_updated + cfg.cycle_display) && display_enabled && (main_mode > MODE_LORA_SYNC)) {
+    if ((now > display_updated + cfg.cycle_display) && display_enabled && (main_mode > MODE_LORA_SYNC)) {
 
         stats.timer_begin = millis();
         display_draw();
         stats.timer_end = millis();
         stats.last_oled_duration = stats.timer_end - stats.timer_begin;
-        display_updated = millis();
+        display_updated = now;
     }
 
 // ---------------------- SERIAL / MSP
 
 
-    if (((millis() > msp_next_cycle) && (msp_step < 3) && (curr.host != HOST_NONE)) && (main_mode > MODE_LORA_SYNC)) {
+    if (now > msp_next_cycle && msp_step < 4 && curr.host != HOST_NONE && main_mode > MODE_LORA_SYNC) {
 
         stats.timer_begin = millis();
 
@@ -917,7 +914,7 @@ void loop() {
 
 // ---------------------- STATISTICS & IO
 
-    if ((millis() > (cfg.cycle_stats + stats_updated)) && (main_mode > MODE_LORA_SYNC)) {
+    if ((now > (cfg.cycle_stats + stats_updated)) && (main_mode > MODE_LORA_SYNC)) {
 
         sys_pps = sys_ppsc;
         sys_ppsc = 0;
