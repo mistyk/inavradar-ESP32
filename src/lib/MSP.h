@@ -224,7 +224,10 @@ struct msp_servo_configurations_t {
 } __attribute__ ((packed));
 
 
+/*
 #define MSP_MAX_SERVO_RULES (2 * MSP_MAX_SUPPORTED_SERVOS)
+
+
 
 // MSP_SERVO_MIX_RULES reply
 struct msp_servo_mix_rules_t {
@@ -237,7 +240,7 @@ struct msp_servo_mix_rules_t {
     uint8_t max;
   } mixRule[MSP_MAX_SERVO_RULES];
 } __attribute__ ((packed));
-
+*/
 
 #define MSP_MAX_SUPPORTED_MOTORS 8
 
@@ -647,11 +650,11 @@ struct msp_radar_pos_t {
   uint8_t id;
   uint8_t state;    // disarmed(0) armed (1)
   int32_t lat;      // decimal degrees latitude * 10000000
-  int32_t lon;      // decimal degrees latitude * 10000000
+  int32_t lon;      // decimal degrees longitude * 10000000
   int32_t alt;      // cm
   uint16_t heading; // deg
   uint16_t speed;   // cm/s
-  uint8_t lq;       // rssi
+  uint8_t lq;       // lq
 } __attribute__((packed));
 
 struct msp_radar_itd_t {

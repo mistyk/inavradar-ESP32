@@ -478,6 +478,7 @@ long LoRaClass::getSignalBandwidth()
   return -1;
 }
 
+// void LoRaClass::setSignalBandwidth(long sbw, long frequency)
 void LoRaClass::setSignalBandwidth(long sbw)
 {
   int bw;
@@ -500,8 +501,18 @@ void LoRaClass::setSignalBandwidth(long sbw)
     bw = 7;
   } else if (sbw <= 250E3) {
     bw = 8;
-  } else /*if (sbw <= 250E3)*/ {
+  } else /*if (sbw == 500E3)*/ {
     bw = 9;
+/*    
+    if (frequency == 443E6)  {
+    writeRegister(0x36, 0x02);
+    writeRegister(0x3a, 0x64);
+    }
+    else { // 868E6 915E6
+    writeRegister(0x36, 0x02);
+    writeRegister(0x3a, 0x7F);
+    }
+ */   
   }
 
   writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0x0f) | (bw << 4));
