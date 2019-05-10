@@ -1,4 +1,4 @@
-#define VERSION "1.01"
+#define VERSION "1.1"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -55,16 +55,17 @@ struct curr_t {
     char name[16];
     uint8_t tick;
     msp_raw_gps_t gps;
+    msp_fc_version_t fcversion;
     msp_analog_t fcanalog;
 };
 
 struct air_type0_t { // 80 bits
     unsigned int id : 3;
     unsigned int type : 3;
-    signed int lat : 25; // -9 000 000 to +9 000 000
-    signed int lon : 26; // -18 000 000 to +18 000 000
+    signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
+    signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
     signed int alt : 14; // -8192m to +8192m
-    unsigned int heading : 9;
+    unsigned int heading : 9; // 0 to 511°
 };
 
 struct air_type1_t { // 80 bits
@@ -74,9 +75,19 @@ struct air_type1_t { // 80 bits
     unsigned int state : 3;
     unsigned int broadcast : 6;
     unsigned int speed : 6; // 64m/s
-    char name[LORA_NAME_LENGTH]; // 7x8
+    char name[LORA_NAME_LENGTH]; // 7 char x 8 bits
     };
 
+struct air_type2_t { // 80 bits
+    unsigned int id : 3;
+    unsigned int type : 3;
+    unsigned int vbat : 8;
+    unsigned int mah : 16;
+    unsigned int rssi : 10;
+    unsigned int temp1 : 20; // Spare
+    unsigned int temp2 : 20; // Spare   
+    };    
+    
 struct stats_t {
     uint32_t up_time_begin;
     uint32_t timer_begin;

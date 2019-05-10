@@ -78,6 +78,9 @@
 // v2 commands
 #define MSP2_ESP32 							 0x2040
 
+#define MSP2_COMMON_SET_RADAR_POS       0x100B //SET radar position information
+#define MSP2_COMMON_SET_RADAR_ITD       0x100C //SET radar information to display
+
 // bits of getActiveModes() return value
 #define MSP_MODE_ARM          0
 #define MSP_MODE_ANGLE        1

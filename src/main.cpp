@@ -20,7 +20,10 @@ curr_t curr; // Our peer
 peer_t peers[LORA_NODES]; // Other peers
 air_type0_t air_0;
 air_type1_t air_1;
-air_type1_t * air_r;
+air_type2_t air_2;
+
+air_type1_t * air_r1;
+air_type2_t * air_r2;
 
 stats_t stats;
 int sys_rssi;
@@ -81,7 +84,7 @@ void set_mode(uint8_t mode) {
         cfg.msp_fc_timeout = 7000;
         cfg.msp_after_tx_delay = 85;
 
-        cfg.cycle_scan = 2500;
+        cfg.cycle_scan = 4000;
         cfg.cycle_display = 250;
         cfg.cycle_stats = 1000;
         
@@ -173,28 +176,42 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
 
 void lora_send() {
 
-    sys_lora_sent++;
+    sys_lora_sent++; // 255 mod 10 and 20 does not loop clean, todo
 
     if (sys_lora_sent % 10 == 0) {
-        air_1.id = curr.id;
-        air_1.type = 1;
-        air_1.host = curr.host;
-        air_1.state = curr.state;
-        air_1.broadcast = 0;
-        air_1.speed = curr.gps.groundSpeed / 100;
-        strncpy(air_1.name, curr.name, LORA_NAME_LENGTH);
 
-        while (!LoRa.beginPacket()) {  }
-        LoRa.write((uint8_t*)&air_1, sizeof(air_1));
-        LoRa.endPacket(false);
+        if (sys_lora_sent % 20 == 0) {
+            air_2.id = curr.id;
+            air_2.type = 2;
+            air_2.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
+            air_2.mah = curr.fcanalog.mAhDrawn;
+            air_2.rssi = curr.fcanalog.rssi; // 0 to 1023
+            
+            while (!LoRa.beginPacket()) {  }
+            LoRa.write((uint8_t*)&air_2, sizeof(air_2));
+            LoRa.endPacket(false);
+        }
+        else {
+            air_1.id = curr.id;
+            air_1.type = 1;
+            air_1.host = curr.host;
+            air_1.state = curr.state;
+            air_1.broadcast = 0;
+            air_1.speed = curr.gps.groundSpeed / 100; // From cm/s to m/s
+            strncpy(air_1.name, curr.name, LORA_NAME_LENGTH);
+
+            while (!LoRa.beginPacket()) {  }
+            LoRa.write((uint8_t*)&air_1, sizeof(air_1));
+            LoRa.endPacket(false);
+            }
     }
     else {
         air_0.id = curr.id;
         air_0.type = 0;
-        air_0.lat = curr.gps.lat / 100;
-        air_0.lon = curr.gps.lon / 100;
-        air_0.alt = curr.gps.alt / 100;
-        air_0.heading = curr.gps.groundCourse / 10;
+        air_0.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
+        air_0.lon = curr.gps.lon / 100; // From XX.1234567 to XX.12345
+        air_0.alt = curr.gps.alt / 100; // From cm to m
+        air_0.heading = curr.gps.groundCourse / 10;  // From degres x 10 to degres
 
         while (!LoRa.beginPacket()) {  }
         LoRa.write((uint8_t*)&air_0, sizeof(air_0));
@@ -223,22 +240,31 @@ void lora_receive(int packetSize) {
 
     if (air_0.type == 1) { // Type 1 packet (Speed + host + state + broadcast + name)
 
-        air_r = (air_type1_t*)&air_0;
+        air_r1 = (air_type1_t*)&air_0;
 
-        peers[id].host = (*air_r).host;
-        peers[id].state = (*air_r).state;
-        peers[id].broadcast = (*air_r).broadcast;
-        peers[id].gps.groundSpeed = (*air_r).speed * 100;
-        strncpy(peers[id].name, (*air_r).name, LORA_NAME_LENGTH);
+        peers[id].host = (*air_r1).host;
+        peers[id].state = (*air_r1).state;
+        peers[id].broadcast = (*air_r1).broadcast;
+        peers[id].gps.groundSpeed = (*air_r1).speed * 100; // From m/s to cm/s
+        strncpy(peers[id].name, (*air_r1).name, LORA_NAME_LENGTH);
         peers[id].name[LORA_NAME_LENGTH] = 0;
+
+    }
+    else if (air_0.type == 2) { // Type 2 packet (vbat mAh RSSI)
+
+        air_r2 = (air_type2_t*)&air_0;
+
+        peers[id].fcanalog.vbat = (*air_r2).vbat;
+        peers[id].fcanalog.mAhDrawn = (*air_r2).mah;
+        peers[id].fcanalog.rssi = (*air_r2).rssi;
 
     }
     else { // Type 0 packet (GPS + heading)
 
-        peers[id].gps.lat = air_0.lat * 100;
-        peers[id].gps.lon = air_0.lon * 100;
-        peers[id].gps.alt = air_0.alt * 100;
-        peers[id].gps.groundCourse = air_0.heading * 10;
+        peers[id].gps.lat = air_0.lat * 100; // From XX.12345 to XX.1234500
+        peers[id].gps.lon = air_0.lon * 100; // From XX.12345 to XX.1234500
+        peers[id].gps.alt = air_0.alt * 100; // From m to cm
+        peers[id].gps.groundCourse = air_0.heading * 10; // From degres to degres x 10
 
         if (peers[id].gps.lat != 0 && peers[id].gps.lon != 0) { // Save the last known coordinates
             peers[id].gpsrec.lat = peers[id].gps.lat;
@@ -424,24 +450,24 @@ void display_draw() {
         display.drawString(0, 10, "MSP TX TIME");
         display.drawString(0, 20, "MSP RX TIME");
         display.drawString(0, 30, "OLED TIME");
-        display.drawString(0, 40, "RX+IDLE TIME");
-        display.drawString(0, 50, "LORA CYCLE");
+        display.drawString(0, 40, "LORA CYCLE");
+        display.drawString(0, 50, "UPTIME");
 
         display.drawString(112, 0, "ms");
         display.drawString(112, 10, "ms");
         display.drawString(112, 20, "ms");
         display.drawString(112, 30, "ms");
         display.drawString(112, 40, "ms");
-        display.drawString(112, 50, "ms");
+        display.drawString(112, 50, "s");
 
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
         display.drawString (111, 0, String(stats.last_tx_duration));
         display.drawString (111, 10, String(stats.last_msp_tx_duration));
         display.drawString (111, 20, String(stats.last_msp_rx_duration));
         display.drawString (111, 30, String(stats.last_oled_duration));
-        display.drawString (111, 40, String(stats.last_rx_duration));
-        display.drawString (111, 50, String(cfg.lora_cycle));
-
+        display.drawString (111, 40, String(cfg.lora_cycle));
+        display.drawString (111, 50, String((int)millis() / 1000));
+        
 
     }
     else if (sys_display_page >= 3) {
@@ -531,11 +557,16 @@ void display_draw() {
                 display.drawString (40, 44, "B " + String(peers[i].direction) + "°");
                 display.drawString (88, 44, "D " + String(peers[i].distance) + "m");
                 display.drawString (0, 54, "R " + String(peers[i].relalt) + "m");
+                
                 if (iscurrent) {
                     display.drawString (40, 54, String((float)curr.fcanalog.vbat / 10) + "v");
                     display.drawString (88, 54, String((int)curr.fcanalog.mAhDrawn) + "mah");
                 }
-
+                else {
+                    display.drawString (40, 54, String((float)peers[i].fcanalog.vbat / 10) + "v");
+                    display.drawString (88, 54, String((int)peers[i].fcanalog.mAhDrawn) + "mah");
+                }
+                
                 display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
             }
@@ -565,6 +596,7 @@ void msp_set_name() {
 
 void msp_set_fc() {
     char j[5];
+    curr.host = HOST_NONE;
     msp.request(MSP_FC_VARIANT, &j, sizeof(j));
 
     if (strncmp(j, "INAV", 4) == 0) {
@@ -573,8 +605,9 @@ void msp_set_fc() {
     else if (strncmp(j, "BTFL", 4) == 0) {
         curr.host = HOST_BTFL;
     }
-    else {
-        curr.host = HOST_NONE;
+    
+    if (curr.host == HOST_INAV || curr.host == HOST_BTFL) {
+        msp.request(MSP_FC_VERSION, &curr.fcversion, sizeof(curr.fcversion));    
     }
  }
 
@@ -594,7 +627,7 @@ void msp_send_peers() {
             radarPos.heading = peers[i].gps.groundCourse;
             radarPos.speed = peers[i].gps.groundSpeed;
             radarPos.lq = peers[i].lq;
-            msp.command(MSP_SET_RADAR_POS, &radarPos, sizeof(radarPos));
+            msp.commandv2(MSP2_COMMON_SET_RADAR_POS, &radarPos, sizeof(radarPos));
         }
     }
 }
@@ -636,28 +669,17 @@ void setup() {
 
     display.drawString(0, 0, "RADAR VERSION");
     display.drawString(90, 0, VERSION);
-    display.display();
 
-    display.drawString (0, 9, "LORA");
-    display.display();
     lora_init();
-    display.drawString (90, 9, "OK");
-    display.display();
-
-    display.drawString (0, 18, "MSP");
-    display.display();
-    Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
     msp.begin(Serial1);
-    display.drawString (90, 18, "OK");
-    display.display();
-
+    Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
     reset_peers();
 
     pinMode(interruptPin, INPUT);
     io_button_pressed = 0;
     attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
-    display.drawString (0, 27, "HOST");
+    display.drawString (0, 9, "HOST");
     display.display();
 
     display_updated = 0;
@@ -698,9 +720,9 @@ void loop() {
             curr.gps.lon = 0;
             curr.gps.alt = 0;
             curr.id = 0;
-
-            display.drawString (90, 27, String(host_name[curr.host]));
-            display.drawString (0, 38, "SCAN");
+            display.drawString (35, 9, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
+            display.drawProgressBar(0, 53, 40, 6, 100);
+            display.drawString (0, 18, "SCAN");
             display.display();
 
             LoRa.sleep();
@@ -715,7 +737,7 @@ void loop() {
                 delay(100);
                 msp_set_fc();
 
-                display.drawProgressBar(35, 30, 48, 6, 100 * (millis() - cycle_scan_begin) / cfg.msp_fc_timeout);
+                display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - cycle_scan_begin) / cfg.msp_fc_timeout);
                 display.display();
                 display_updated = millis();
             }
@@ -742,10 +764,10 @@ void loop() {
             if ((millis() > display_updated + cfg.cycle_display / 2) && display_enabled) {
                 for (int i = 0; i < LORA_NODES; i++) {
                     if (peers[i].id > 0) {
-                        display.drawString(40 + peers[i].id * 8, 38, String(peer_slotname[peers[i].id]));
+                        display.drawString(40 + peers[i].id * 8, 18, String(peer_slotname[peers[i].id]));
                     }
                 }
-                display.drawProgressBar(0, 53, 126, 6, 100 * (millis() - cycle_scan_begin) / cfg.cycle_scan);
+                display.drawProgressBar(40, 53, 86, 6, 100 * (millis() - cycle_scan_begin) / cfg.cycle_scan);
                 display.display();
                 display_updated = millis();
             }
