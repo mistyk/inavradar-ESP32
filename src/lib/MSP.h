@@ -672,7 +672,7 @@ class MSP {
 
   public:
 
-    void begin(Stream & stream, uint32_t timeout = 500);
+    void begin(Stream & stream, uint32_t timeout = 100);
 
     // low level functions
 
@@ -680,17 +680,21 @@ class MSP {
 
     void send(uint8_t messageID, void * payload, uint8_t size);
 
-    void sendv2(uint16_t messageID, void * payload, uint16_t size);
+        void send2(uint16_t messageID, void * payload, uint8_t size);
 
     bool recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);
 
+        bool recv2(uint16_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize);
+    
     bool waitFor(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
 
+        bool waitFor2(uint16_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
+    
     bool request(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize = NULL);
 
     bool command(uint8_t messageID, void * payload, uint8_t size, bool waitACK = true);
 
-    bool commandv2(uint16_t messageID, void * payload, uint16_t size, bool waitACK = true);
+        bool command2(uint16_t messageID, void * payload, uint8_t size, bool waitACK = true);
 
     void reset();
 

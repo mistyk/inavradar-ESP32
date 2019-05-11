@@ -15,6 +15,7 @@ SSD1306 display(0x3c, 4, 15);
 
 config_t cfg;
 MSP msp;
+msp_radar_pos_t radarPos;
 
 curr_t curr; // Our peer
 peer_t peers[LORA_NODES]; // Other peers
@@ -84,13 +85,15 @@ void set_mode(uint8_t mode) {
         cfg.lora_antidrift_correction = 5;
         cfg.lora_peer_timeout = 6000;
 
+        cfg.msp_version = 2;
+        cfg.msp_timeout = 100;
         cfg.msp_fc_timeout = 7000;
         cfg.msp_after_tx_delay = 90;
 
         cfg.cycle_scan = 4000;
         cfg.cycle_display = 250;
         cfg.cycle_stats = 1000;
-        
+
         break;
 
     }
@@ -179,7 +182,7 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
 
 void lora_send() {
 
-    sys_lora_sent++; 
+    sys_lora_sent++;
 
     if (sys_lora_sent % 8 == 0) {
 
@@ -189,7 +192,7 @@ void lora_send() {
             air_2.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
             air_2.mah = curr.fcanalog.mAhDrawn;
             air_2.rssi = curr.fcanalog.rssi; // 0 to 1023
-            
+
             while (!LoRa.beginPacket()) {  }
             LoRa.write((uint8_t*)&air_2, sizeof(air_2));
             LoRa.endPacket(false);
@@ -213,7 +216,7 @@ void lora_send() {
         air_0.type = 0;
         air_0.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
         air_0.lon = curr.gps.lon / 100; // From XX.1234567 to XX.12345
-        air_0.alt = curr.gps.alt / 100; // From cm to m
+        air_0.alt = curr.gps.alt; // m
         air_0.heading = curr.gps.groundCourse / 10;  // From degres x 10 to degres
 
         while (!LoRa.beginPacket()) {  }
@@ -266,7 +269,7 @@ void lora_receive(int packetSize) {
 
         peers[id].gps.lat = air_0.lat * 100; // From XX.12345 to XX.1234500
         peers[id].gps.lon = air_0.lon * 100; // From XX.12345 to XX.1234500
-        peers[id].gps.alt = air_0.alt * 100; // From m to cm
+        peers[id].gps.alt = air_0.alt; // m
         peers[id].gps.groundCourse = air_0.heading * 10; // From degres to degres x 10
 
         if (peers[id].gps.lat != 0 && peers[id].gps.lon != 0) { // Save the last known coordinates
@@ -445,10 +448,10 @@ void display_draw() {
 
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
-        display.drawString(0, 0, "TX TIME");
-        display.drawString(0, 10, "MSP TX TIME");
-        display.drawString(0, 20, "MSP RX TIME");
-        display.drawString(0, 30, "OLED TIME");
+        display.drawString(0, 0, "LORA TX");
+        display.drawString(0, 10, "MSP TX");
+        display.drawString(0, 20, "MSP RX");
+        display.drawString(0, 30, "OLED");
         display.drawString(0, 40, "LORA CYCLE");
         display.drawString(0, 50, "UPTIME");
 
@@ -467,6 +470,11 @@ void display_draw() {
         display.drawString (111, 40, String(cfg.lora_cycle));
         display.drawString (111, 50, String((int)millis() / 1000));
         
+        if (cfg.msp_version > 0) {
+            display.drawString(72, 10, "MSP"+String(cfg.msp_version));
+        }
+        
+
 
     }
     else if (sys_display_page >= 3) {
@@ -533,12 +541,12 @@ void display_draw() {
 
                 if (iscurrent) {
                     display.drawString (0, 24, "A " + String(curr.gps.alt) + "m");
-                    display.drawString (0, 34, "S " + String(peers[i].gpsrec.groundSpeed) + "m/s");
+                    display.drawString (0, 34, "S " + String(peers[i].gpsrec.groundSpeed / 100) + "m/s");
                     display.drawString (0, 44, "C " + String(curr.gps.groundCourse / 10) + "°");
                 }
                 else {
                     display.drawString (0, 24, "A " + String(peers[i].gpsrec.alt) + "m");
-                    display.drawString (0, 34, "S " + String(peers[i].gpsrec.groundSpeed) + "m/s");
+                    display.drawString (0, 34, "S " + String(peers[i].gpsrec.groundSpeed / 100) + "m/s");
                     display.drawString (0, 44, "C " + String(peers[i].gpsrec.groundCourse / 10) + "°");
                 }
 
@@ -556,7 +564,7 @@ void display_draw() {
                 display.drawString (40, 44, "B " + String(peers[i].direction) + "°");
                 display.drawString (88, 44, "D " + String(peers[i].distance) + "m");
                 display.drawString (0, 54, "R " + String(peers[i].relalt) + "m");
-                
+
                 if (iscurrent) {
                     display.drawString (40, 54, String((float)curr.fcanalog.vbat / 10) + "v");
                     display.drawString (88, 54, String((int)curr.fcanalog.mAhDrawn) + "mah");
@@ -565,7 +573,7 @@ void display_draw() {
                     display.drawString (40, 54, String((float)peers[i].fcanalog.vbat / 10) + "v");
                     display.drawString (88, 54, String((int)peers[i].fcanalog.mAhDrawn) + "mah");
                 }
-                
+
             display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
         }
@@ -593,6 +601,10 @@ void msp_set_name() {
     msp.request(MSP_NAME, &curr.name, sizeof(curr.name));
 }
 
+void msp_set_gps() {
+    msp.request(MSP_RAW_GPS, &curr.gps, sizeof(curr.gps));
+}
+
 void msp_set_fc() {
     char j[5];
     curr.host = HOST_NONE;
@@ -604,9 +616,9 @@ void msp_set_fc() {
     else if (strncmp(j, "BTFL", 4) == 0) {
         curr.host = HOST_BTFL;
     }
-    
+
     if (curr.host == HOST_INAV || curr.host == HOST_BTFL) {
-        msp.request(MSP_FC_VERSION, &curr.fcversion, sizeof(curr.fcversion));    
+        msp.request(MSP_FC_VERSION, &curr.fcversion, sizeof(curr.fcversion));
     }
  }
 
@@ -615,19 +627,17 @@ void msp_set_fc() {
 }
 
 void msp_send_peers() {
-    msp_radar_pos_t radarPos;
     for (int i = 0; i < LORA_NODES; i++) {
         if (peers[i].id > 0) {
             radarPos.id = i;
             radarPos.state = peers[i].state;
-            radarPos.lat = peers[i].gps.lat;
-            radarPos.lon = peers[i].gps.lon;
-            radarPos.alt = peers[i].gps.alt;
-            radarPos.heading = peers[i].gps.groundCourse;
-            radarPos.speed = peers[i].gps.groundSpeed;
+            radarPos.lat = peers[i].gps.lat; // x 10E7
+            radarPos.lon = peers[i].gps.lon; // x 10E7
+            radarPos.alt = peers[i].gps.alt * 100; // cm
+            radarPos.heading = peers[i].gps.groundCourse / 10; // From ° x 10 to °
+            radarPos.speed = peers[i].gps.groundSpeed; // cm/s
             radarPos.lq = peers[i].lq;
-           // msp.commandv2(MSP2_COMMON_SET_RADAR_POS, &radarPos, sizeof(radarPos));
-            msp.command(MSP_SET_RADAR_POS, &radarPos, sizeof(radarPos));
+            msp.command2(MSP2_COMMON_SET_RADAR_POS , &radarPos, sizeof(radarPos), 0);
         }
     }
 }
@@ -710,7 +720,8 @@ void loop() {
             if (curr.host != HOST_NONE) {
                 msp_set_name();
             }
-            else {
+            
+            if (curr.name[0] == '\0') {
                 for (int i = 0; i < 4; i++) {
                 curr.name[i] = (char) random(65, 90);
                 curr.name[4] = 0;
@@ -722,7 +733,13 @@ void loop() {
             curr.gps.lon = 0;
             curr.gps.alt = 0;
             curr.id = 0;
-            display.drawString (35, 9, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
+            if (curr.host > 0) {
+                display.drawString (35, 9, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
+            }
+            else {
+                display.drawString (35, 9, String(host_name[curr.host]));
+            }
+            
             display.drawProgressBar(0, 53, 40, 6, 100);
             display.drawString (0, 18, "SCAN");
             display.display();
@@ -804,7 +821,7 @@ void loop() {
     if ((main_mode == MODE_LORA_RX) && (now > lora_next_tx)) {
 
         // lora_last_tx = lora_next_tx;
-        
+
         while (now > lora_next_tx) { // In  case we skipped some beats
             lora_next_tx += cfg.lora_cycle;
         }
@@ -894,13 +911,14 @@ void loop() {
             break;
 
         case 2: // Between TX slots 2 and 3
-            msp.request(MSP_RAW_GPS, &curr.gps, sizeof(curr.gps));
+            msp_set_gps();
             stats.last_msp_rx_duration = millis() - stats.timer_begin;
             break;
 
         case 3: // Between TX slots 3 and 0
             if (curr.host == HOST_INAV) {
                 msp_send_peers();
+                delay(5);
                 stats.last_msp_tx_duration = millis() - stats.timer_begin;
             }
             break;

@@ -114,6 +114,8 @@ struct config_t {
     uint8_t lora_antidrift_correction;
     uint16_t lora_peer_timeout;
 
+    uint8_t msp_version;
+    uint8_t msp_timeout;
     uint16_t msp_fc_timeout;
     uint16_t msp_after_tx_delay;
 

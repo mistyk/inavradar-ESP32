@@ -67,7 +67,7 @@ uint8_t MSP::crc8_dvb_s2(uint8_t crc, byte a)
     return crc;
 }
 
-void MSP::sendv2(uint16_t messageID, void * payload, uint16_t size)
+void MSP::send2(uint16_t messageID, void * payload, uint8_t size) // 255 chars max, out of V2 specs
 {
   uint8_t _crc = 0;
   uint8_t message[size + 9];
@@ -79,17 +79,17 @@ void MSP::sendv2(uint16_t messageID, void * payload, uint16_t size)
   message[5] = messageID >> 8;
   message[6] = size; //payload size
   message[7] = size >> 8;
-  for(uint8_t i = 0; i < 8; i++) {
+  for(uint8_t i = 3; i < 8; i++) {
     _crc = crc8_dvb_s2(_crc, message[i]);
   }
   //Start of Payload
   uint8_t * payloadPtr = (uint8_t*)payload;
-  for (uint8_t i = 0; i < size; ++i) {
-    message[i+8] = *(payloadPtr++);
-    _crc = crc8_dvb_s2(_crc, message[i+8]);
+  for (uint16_t i = 0; i < size; ++i) {
+    message[i + 8] = *(payloadPtr++);
+    _crc = crc8_dvb_s2(_crc, message[i + 8]);
   }
-  message[size+8] = _crc;
-  _stream->write(message,sizeof(message));
+  message[size + 8] = _crc;
+  _stream->write(message, sizeof(message));
 }
 
 // timeout in milliseconds
@@ -149,6 +149,61 @@ bool MSP::recv(uint8_t * messageID, void * payload, uint8_t maxSize, uint8_t * r
 }
 
 
+bool MSP::recv2(uint16_t * messageID, void * payload, uint8_t maxSize, uint8_t * recvSize)
+{
+  uint32_t t0 = millis();
+
+  while (1) {
+
+    // read header
+    while (_stream->available() < 6)
+      if (millis() - t0 >= _timeout)
+        return false;
+    char header[4];
+    _stream->readBytes((char*)header, 4);
+
+    // check header
+    if (header[0] == '$' && header[1] == 'X' && header[2] == '>') {
+
+      // read message ID (type)
+      *messageID = _stream->read();
+
+
+    // header ok, read payload size
+      *recvSize = _stream->read();
+
+
+
+      // read payload
+      uint8_t * payloadPtr = (uint8_t*)payload;
+      uint8_t idx = 0;
+      while (idx < *recvSize) {
+        if (millis() - t0 >= _timeout)
+          return false;
+        if (_stream->available() > 0) {
+          uint8_t b = _stream->read();
+
+          if (idx < maxSize)
+            *(payloadPtr++) = b;
+          ++idx;
+        }
+      }
+      // zero remaining bytes if *size < maxSize
+      for (; idx < maxSize; ++idx)
+        *(payloadPtr++) = 0;
+
+
+
+        return true;
+
+
+
+    }
+  }
+
+}
+
+
 // wait for messageID
 // recvSize can be NULL
 bool MSP::waitFor(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize)
@@ -164,6 +219,18 @@ bool MSP::waitFor(uint8_t messageID, void * payload, uint8_t maxSize, uint8_t * 
   return false;
 }
 
+bool MSP::waitFor2(uint16_t messageID, void * payload, uint8_t maxSize, uint8_t * recvSize)
+{
+  uint16_t recvMessageID;
+  uint8_t recvSizeValue;
+  uint32_t t0 = millis();
+  while (millis() - t0 < _timeout)
+    if (recv2(&recvMessageID, payload, maxSize, (recvSize ? recvSize : &recvSizeValue)) && messageID == recvMessageID)
+      return true;
+
+  // timeout
+  return false;
+}
 
 // send a message and wait for the reply
 // recvSize can be NULL
@@ -186,13 +253,13 @@ bool MSP::command(uint8_t messageID, void * payload, uint8_t size, bool waitACK)
   return true;
 }
 
-bool MSP::commandv2(uint16_t messageID, void * payload, uint16_t size, bool waitACK)
+bool MSP::command2(uint16_t messageID, void * payload, uint8_t size, bool waitACK)
 {
-  sendv2(messageID, payload, size);
+  send2(messageID, payload, size);
 
   // ack required
   if (waitACK)
-    return waitFor(messageID, NULL, 0);
+    return waitFor2(messageID, NULL, 0);
 
   return true;
 }
