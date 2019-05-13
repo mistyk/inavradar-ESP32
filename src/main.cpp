@@ -78,17 +78,20 @@ void set_mode(uint8_t mode) {
         cfg.lora_coding_rate = 5;
         cfg.lora_spreading_factor = 9;
         cfg.lora_power = 20;
-        cfg.lora_cycle = 500;
         cfg.lora_slot_spacing = 125;
+        cfg.lora_nodes_max = LORA_NODES;
+        cfg.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
         cfg.lora_timing_delay = -60;
         cfg.lora_antidrift_threshold = 5;
         cfg.lora_antidrift_correction = 5;
         cfg.lora_peer_timeout = 6000;
 
+//        cfg.lora_air_mode = LORA_NODES_MIN;
+
         cfg.msp_version = 2;
         cfg.msp_timeout = 100;
         cfg.msp_fc_timeout = 7000;
-        cfg.msp_after_tx_delay = 90;
+        cfg.msp_after_tx_delay = 85;
 
         cfg.cycle_scan = 4000;
         cfg.cycle_display = 250;
@@ -340,12 +343,14 @@ void display_draw() {
         display.setFont(ArialMT_Plain_24);
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
         display.drawString(26, 11, String(curr.gps.numSat));
-        display.drawString(13, 42, String(sys_num_peers));
+        display.drawString(13, 42, String(sys_num_peers + 1));
         display.drawString (125, 11, String(peer_slotname[curr.id]));
 
-        // display.drawString(119, 0, String((float)curr.vbat / 10));
-
         display.setFont(ArialMT_Plain_10);
+
+//        display.drawString (83, 44, String(cfg.lora_cycle) + "ms");
+//        display.drawString (105, 23, String(cfg.lora_nodes_max));
+
         display.drawString (126, 29, "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ");
         display.drawString (107, 44, String(stats.percent_received));
         display.drawString(107, 54, String(sys_rssi));
@@ -354,27 +359,19 @@ void display_draw() {
         display.drawString (64, 0, String(sys_message));
 
         display.setTextAlignment (TEXT_ALIGN_LEFT);
-        display.drawString (60, 12, String(curr.name));
+        display.drawString (55, 12, String(curr.name));
         display.drawString (27, 23, "SAT");
         display.drawString (108, 44, "%E");
 
-        display.drawString(23, 44, String(sys_pps) + "p/s");
+        display.drawString(21, 54, String(sys_pps) + "p/s");
         display.drawString (109, 54, "dB");
-        display.drawString (60, 23, String(host_name[curr.host]));
+        display.drawString (55, 23, String(host_name[curr.host]));
 
         if (last_received_id > 0) {
             display.drawString (36 + last_received_id * 8, 54, String(peer_slotname[last_received_id]));
         }
 
-        if (sys_num_peers == 0) {
-            display.drawString (15, 54, "Solo");
-            }
-        else if (sys_num_peers == 1) {
-            display.drawString (15, 54, "Peer");
-            }
-        else {
-            display.drawString (15, 54, "Peers");
-            }
+        display.drawString (15, 44, "Nod/" + String(cfg.lora_nodes_max));
 
         if (curr.gps.fixType == 1) display.drawString (27, 12, "2D");
         if (curr.gps.fixType == 2) display.drawString (27, 12, "3D");
@@ -452,7 +449,7 @@ void display_draw() {
         display.drawString(0, 10, "MSP TX");
         display.drawString(0, 20, "MSP RX");
         display.drawString(0, 30, "OLED");
-        display.drawString(0, 40, "LORA CYCLE");
+        display.drawString(0, 40, "CYCLES");
         display.drawString(0, 50, "UPTIME");
 
         display.drawString(112, 0, "ms");
@@ -465,15 +462,16 @@ void display_draw() {
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
         display.drawString (111, 0, String(stats.last_tx_duration));
         display.drawString (111, 10, String(stats.last_msp_tx_duration));
-        display.drawString (111, 20, String(stats.last_msp_rx_duration));
+//        display.drawString (111, 20, String(stats.last_msp_rx_duration));
+        display.drawString (111, 20, String(stats.last_msp_rx1_duration) + " / " + String(stats.last_msp_rx2_duration) + " / " + String(stats.last_msp_rx3_duration));
         display.drawString (111, 30, String(stats.last_oled_duration));
-        display.drawString (111, 40, String(cfg.lora_cycle));
+        display.drawString (111, 40, String(cfg.lora_slot_spacing) + " / " + String(cfg.lora_cycle));
         display.drawString (111, 50, String((int)millis() / 1000));
-        
+
         if (cfg.msp_version > 0) {
             display.drawString(72, 10, "MSP"+String(cfg.msp_version));
         }
-        
+
 
 
     }
@@ -720,7 +718,7 @@ void loop() {
             if (curr.host != HOST_NONE) {
                 msp_set_name();
             }
-            
+
             if (curr.name[0] == '\0') {
                 for (int i = 0; i < 4; i++) {
                 curr.name[i] = (char) random(65, 90);
@@ -739,7 +737,7 @@ void loop() {
             else {
                 display.drawString (35, 9, String(host_name[curr.host]));
             }
-            
+
             display.drawProgressBar(0, 53, 40, 6, 100);
             display.drawString (0, 18, "SCAN");
             display.display();
@@ -775,8 +773,10 @@ void loop() {
                 sys_display_page = 0;
             }
             else {
+//                cfg.lora_cycle =  cfg.lora_slot_spacing * cfg.lora_air_mode;
                 pick_id();
             }
+
             main_mode = MODE_LORA_SYNC;
 
         } else { // Still scanning
@@ -896,33 +896,41 @@ void loop() {
 
         switch (msp_step) {
 
-        case 0: // Between TX slots 0 and 1
+        case 0: // Between slots 0 and 1
 
             if (sys_lora_sent % 8 == 0) {
                 msp_set_fcanalog();
-                stats.timer_end = millis();
-                stats.last_msp_rx_duration = stats.timer_end - stats.timer_begin;
             }
-            break;
 
-        case 1: // Between TX slots 1 and 2
+            stats.timer_end = millis();
+            stats.last_msp_rx1_duration = stats.timer_end - stats.timer_begin;
+
+        break;
+
+        case 1: // Between slots 1 and 2
+        
             msp_set_state();
-            stats.last_msp_rx_duration = millis()- stats.timer_begin;
+            stats.last_msp_rx2_duration = millis() - stats.timer_begin;
+
             break;
 
-        case 2: // Between TX slots 2 and 3
+        case 2: // Between slots 2 and 3
+        
             msp_set_gps();
-            stats.last_msp_rx_duration = millis() - stats.timer_begin;
-            break;
-
-        case 3: // Between TX slots 3 and 0
+            stats.last_msp_rx3_duration = millis() - stats.timer_begin;
+            
+        break;
+        
+        case 3: // Between slots 3 and 4
+        
             if (curr.host == HOST_INAV) {
                 msp_send_peers();
-                delay(5);
+                // delay(4);
                 stats.last_msp_tx_duration = millis() - stats.timer_begin;
             }
-            break;
-
+            
+        break;        
+        
         }
 
         msp_next_cycle += cfg.lora_slot_spacing;
@@ -961,6 +969,14 @@ void loop() {
         stats.packets_total += sys_num_peers * cfg.cycle_stats / cfg.lora_cycle;
         stats.packets_received += sys_pps;
         stats.percent_received = (stats.packets_received > 0) ? constrain(100 * stats.packets_received / stats.packets_total, 0 ,100) : 0;
+
+/*
+        if (sys_num_peers >= (cfg.lora_air_mode - 1)&& (cfg.lora_air_mode < LORA_NODES_MAX)) {
+            cfg.lora_air_mode++;
+            lora_next_tx += cfg.lora_slot_spacing ;
+            cfg.lora_cycle =  cfg.lora_slot_spacing * cfg.lora_air_mode;
+            }
+ */
 
         // Screen management
 

@@ -1,4 +1,4 @@
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -13,6 +13,9 @@
 
 #define LORA_NODES 4
 #define LORA_PERF_MODE 0
+
+#define LORA_NODES_MIN 2
+#define LORA_NODES_MAX 9
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -85,9 +88,9 @@ struct air_type2_t { // 80 bits
     unsigned int mah : 16;
     unsigned int rssi : 10;
     unsigned int temp1 : 20; // Spare
-    unsigned int temp2 : 20; // Spare   
-    };    
-    
+    unsigned int temp2 : 20; // Spare
+    };
+
 struct stats_t {
     uint32_t timer_begin;
     uint32_t timer_end;
@@ -98,6 +101,9 @@ struct stats_t {
     uint16_t last_rx_duration;
     uint16_t last_msp_tx_duration;
     uint16_t last_msp_rx_duration;
+    uint16_t last_msp_rx1_duration;
+    uint16_t last_msp_rx2_duration;
+    uint16_t last_msp_rx3_duration;        
     uint16_t last_oled_duration;
 };
 
@@ -107,12 +113,15 @@ struct config_t {
     uint8_t lora_coding_rate;
     uint8_t lora_spreading_factor;
     uint8_t lora_power;
-    uint16_t lora_cycle;
+    uint8_t lora_nodes_max;
     uint16_t lora_slot_spacing;
+    uint16_t lora_cycle;
     int16_t lora_timing_delay;
     uint8_t lora_antidrift_threshold;
     uint8_t lora_antidrift_correction;
     uint16_t lora_peer_timeout;
+
+    uint8_t lora_air_mode;
 
     uint8_t msp_version;
     uint8_t msp_timeout;
