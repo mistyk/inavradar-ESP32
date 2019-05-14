@@ -11,11 +11,10 @@
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
-#define LORA_NODES 4
 #define LORA_PERF_MODE 0
 
 #define LORA_NODES_MIN 2
-#define LORA_NODES_MAX 9
+#define LORA_NODES_MAX 4
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -29,13 +28,14 @@
 #define HOST_BTFL 2
 
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
-char host_state[3][5]={"IDLE", "ARM", ""};
+char host_state[2][5]={"", "ARM"};
 char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
 
 struct peer_t {
    uint8_t id;
    uint8_t host;
    uint8_t state;
+   bool lost;
    uint8_t broadcast;
    uint32_t updated;
    uint32_t lq_updated;
@@ -91,21 +91,6 @@ struct air_type2_t { // 80 bits
     unsigned int temp2 : 20; // Spare
     };
 
-struct stats_t {
-    uint32_t timer_begin;
-    uint32_t timer_end;
-    float packets_total;
-    uint32_t packets_received;
-    uint8_t percent_received;
-    uint16_t last_tx_duration;
-    uint16_t last_rx_duration;
-    uint16_t last_msp_tx_duration;
-    uint16_t last_msp_rx_duration;
-    uint16_t last_msp_rx1_duration;
-    uint16_t last_msp_rx2_duration;
-    uint16_t last_msp_rx3_duration;        
-    uint16_t last_oled_duration;
-};
 
 struct config_t {
     uint32_t lora_frequency;
@@ -131,6 +116,58 @@ struct config_t {
     uint16_t cycle_scan;
     uint16_t cycle_display;
     uint16_t cycle_stats;
+};
+
+struct system_t {
+    uint8_t phase;
+
+    uint32_t now = 0;
+    uint32_t now_sec = 0;
+    
+    uint8_t air_last_received_id = 0;    
+    int last_rssi;
+    uint8_t pps = 0;
+    uint8_t ppsc = 0;
+    uint8_t num_peers = 0;
+    uint8_t num_peers_active = 0;
+    
+    uint8_t lora_tick;    
+    bool lora_no_tx = 0;
+    uint8_t lora_slot = 0;   
+    uint32_t lora_last_tx = 0;
+    uint32_t lora_last_rx = 0;
+    uint32_t lora_next_tx = 0;
+    int32_t lora_drift = 0;
+    int drift_correction = 0;
+     
+    uint32_t msp_next_cycle = 0;    
+    
+    uint8_t display_page = 0;
+    bool display_enable = 1;
+    uint32_t display_updated = 0;
+    
+    uint32_t io_button_released = 0;
+    bool io_button_pressed = 0;
+
+    uint32_t cycle_scan_begin;    
+    uint32_t stats_updated = 0;
+    
+    char message[20];
+};
+
+struct stats_t {
+    uint32_t timer_begin;
+    uint32_t timer_end;
+    float packets_total;
+    uint32_t packets_received;
+    uint8_t percent_received;
+    uint16_t last_tx_duration;
+    uint16_t last_rx_duration;
+    uint16_t last_msp_0_duration;    
+    uint16_t last_msp_1_duration;
+    uint16_t last_msp_2_duration;
+    uint16_t last_msp_3_duration;        
+    uint16_t last_oled_duration;
 };
 
 const uint8_t icon_lq_1[] PROGMEM = {

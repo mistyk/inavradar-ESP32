@@ -228,7 +228,6 @@ bool MSP::waitFor2(uint16_t messageID, void * payload, uint8_t maxSize, uint8_t 
     if (recv2(&recvMessageID, payload, maxSize, (recvSize ? recvSize : &recvSizeValue)) && messageID == recvMessageID)
       return true;
 
-  // timeout
   return false;
 }
 
