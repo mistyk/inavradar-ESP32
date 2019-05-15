@@ -5,7 +5,7 @@
 #include <SSD1306.h>
 #include <EEPROM.h>
 #include <main.h>
-
+#include <inavradarlogo.h>
 #include <math.h>
 #include <cmath>
 
@@ -545,6 +545,13 @@ void display_draw() {
     display.display();
 }
 
+void display_logo() {
+    display.drawXbm(0, 0, logo_width_s, logo_height_s, logo_bits_s);
+    display.display();
+    delay(2000);
+    display.clear();
+}
+
 // -------- MSP and FC
 
 
@@ -631,13 +638,14 @@ void IRAM_ATTR handleInterrupt() {
 }
 
 
-// -----------------------------
+// ----------------------------- setup
 
 void setup() {
 
     set_mode(LORA_PERF_MODE);
 
     display_init();
+    display_logo();
 
     display.drawString(0, 0, "RADAR VERSION");
     display.drawString(90, 0, VERSION);
@@ -980,7 +988,7 @@ if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE 
     sys.stats_updated = sys.now;
     }
 
-    
+
     // LED blinker
 
     if (sys.lora_tick % 6 == 0) {
