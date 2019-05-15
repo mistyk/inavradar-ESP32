@@ -1,4 +1,4 @@
-#define VERSION "1.2"
+#define VERSION "1.21"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -6,7 +6,7 @@
 #define MODE_LORA_RX     3
 #define MODE_LORA_TX     4
 
-#define LORA_NAME_LENGTH 7
+#define LORA_NAME_LENGTH 6
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
@@ -15,6 +15,9 @@
 
 #define LORA_NODES_MIN 2
 #define LORA_NODES_MAX 4
+
+#define LED 2
+#define IO_LEDBLINK_DURATION 160
 
 #define SCK 5 // GPIO5 - SX1278's SCK
 #define MISO 19 // GPIO19 - SX1278's MISO
@@ -78,7 +81,8 @@ struct air_type1_t { // 80 bits
     unsigned int state : 3;
     unsigned int broadcast : 6;
     unsigned int speed : 6; // 64m/s
-    char name[LORA_NAME_LENGTH]; // 7 char x 8 bits
+    char name[LORA_NAME_LENGTH]; // 6 char x 8 bits = 48
+    unsigned int temp1 : 8; // Spare
     };
 
 struct air_type2_t { // 80 bits
@@ -123,35 +127,38 @@ struct system_t {
 
     uint32_t now = 0;
     uint32_t now_sec = 0;
-    
-    uint8_t air_last_received_id = 0;    
+
+    uint8_t air_last_received_id = 0;
     int last_rssi;
     uint8_t pps = 0;
     uint8_t ppsc = 0;
     uint8_t num_peers = 0;
     uint8_t num_peers_active = 0;
-    
-    uint8_t lora_tick;    
+
+    uint8_t lora_tick;
     bool lora_no_tx = 0;
-    uint8_t lora_slot = 0;   
+    uint8_t lora_slot = 0;
     uint32_t lora_last_tx = 0;
     uint32_t lora_last_rx = 0;
     uint32_t lora_next_tx = 0;
     int32_t lora_drift = 0;
     int drift_correction = 0;
-     
-    uint32_t msp_next_cycle = 0;    
-    
+
+    uint32_t msp_next_cycle = 0;
+
     uint8_t display_page = 0;
     bool display_enable = 1;
     uint32_t display_updated = 0;
-    
+
     uint32_t io_button_released = 0;
     bool io_button_pressed = 0;
 
-    uint32_t cycle_scan_begin;    
+    uint32_t cycle_scan_begin;
+    uint32_t io_led_changestate;
+    uint8_t io_led_count;
+    uint8_t io_led_blink;
     uint32_t stats_updated = 0;
-    
+
     char message[20];
 };
 
@@ -163,10 +170,10 @@ struct stats_t {
     uint8_t percent_received;
     uint16_t last_tx_duration;
     uint16_t last_rx_duration;
-    uint16_t last_msp_0_duration;    
+    uint16_t last_msp_0_duration;
     uint16_t last_msp_1_duration;
     uint16_t last_msp_2_duration;
-    uint16_t last_msp_3_duration;        
+    uint16_t last_msp_3_duration;
     uint16_t last_oled_duration;
 };
 

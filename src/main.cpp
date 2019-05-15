@@ -29,6 +29,8 @@ air_type2_t air_2;
 air_type1_t * air_r1;
 air_type2_t * air_r2;
 
+
+
 // -------- SYSTEM
 
 void set_mode(uint8_t mode) {
@@ -155,8 +157,6 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
 // -------- LoRa
 
 void lora_send() {
-
-    sys.lora_tick++;
 
     if (sys.lora_tick % 8 == 0) {
 
@@ -353,7 +353,7 @@ void display_draw() {
 
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
-        
+
         display.drawHorizontalLine(0, 11, 128);
 
         long pos[LORA_NODES_MAX];
@@ -374,9 +374,9 @@ void display_draw() {
         int rect_l = stats.last_tx_duration * 128 / cfg.lora_cycle;
 
         for (int i = 0; i < LORA_NODES_MAX; i++) {
-            
+
             display.setTextAlignment (TEXT_ALIGN_LEFT);
-            
+
             if (pos[i] > -1) {
                 display.drawRect(pos[i], 0, rect_l, 12);
                 display.drawString (pos[i] + 2, 0, String(peer_slotname[peers[i].id]));
@@ -386,8 +386,8 @@ void display_draw() {
             line = j * 9 + 14;
 
                 display.drawString (0, line, String(peer_slotname[peers[i].id]));
-                display.drawString (16, line, String(peers[i].name));
-                display.drawString (56, line, String(host_name[peers[i].host]));
+                display.drawString (12, line, String(peers[i].name));
+                display.drawString (60, line, String(host_name[peers[i].host]));
                 display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
                 if (peers[i].lost) { // Peer timed out
@@ -471,7 +471,7 @@ void display_draw() {
                 }
                 else {
                     if (!peers[i].lost) {
-                        display.drawString (38, 0, String(peers[i].rssi) + "db");
+                        display.drawString (28, 0, String(peers[i].rssi) + "db");
                     }
                     display.drawString (19, 12, String(host_name[peers[i].host]));
                 }
@@ -558,6 +558,7 @@ void msp_get_state() {
 
 void msp_get_name() {
     msp.request(MSP_NAME, &curr.name, sizeof(curr.name));
+    curr.name[6] = '\0';
 }
 
 void msp_get_gps() {
@@ -655,6 +656,11 @@ void setup() {
 
     sys.display_updated = 0;
     sys.cycle_scan_begin = millis();
+
+    sys.io_led_blink = 0;
+
+    pinMode(LED, OUTPUT);
+    digitalWrite(LED, HIGH);
 
     curr.host = HOST_NONE;
 
@@ -778,6 +784,8 @@ void loop() {
 
 //        lanceMSP();
 
+        digitalWrite(LED, LOW);
+
         sys.phase = MODE_LORA_RX;
         }
 
@@ -797,6 +805,9 @@ void loop() {
         else {
             sys.phase = MODE_LORA_TX;
         }
+
+    sys.lora_tick++;
+
     }
 
 // ---------------------- LORA TX
@@ -967,6 +978,35 @@ if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE 
         }
 
     sys.stats_updated = sys.now;
+    }
+
+    
+    // LED blinker
+
+    if (sys.lora_tick % 6 == 0) {
+        if (sys.num_peers_active > 0) {
+            sys.io_led_changestate = millis() + IO_LEDBLINK_DURATION;
+            sys.io_led_count = 0;
+            sys.io_led_blink = 1;
+        }
+    }
+
+    if (sys.io_led_blink && millis() > sys.io_led_changestate) {
+
+        sys.io_led_count++;
+        sys.io_led_changestate += IO_LEDBLINK_DURATION;
+
+        if (sys.io_led_count % 2 == 0) {
+            digitalWrite(LED, LOW);
+        }
+        else {
+            digitalWrite(LED, HIGH);
+        }
+
+        if (sys.io_led_count >= sys.num_peers_active * 2) {
+            sys.io_led_blink = 0;
+        }
+
     }
 
 }
