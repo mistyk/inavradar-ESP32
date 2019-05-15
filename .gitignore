@@ -5,3 +5,4 @@
 .gcc-flags.json
 .DS_Store
 src/.DS_Store
+platformio.ini
