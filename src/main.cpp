@@ -53,7 +53,7 @@ void set_mode(uint8_t mode) {
 
         cfg.msp_version = 2;
         cfg.msp_timeout = 100;
-        cfg.msp_fc_timeout = 8000;
+        cfg.msp_fc_timeout = 6000;
         cfg.msp_after_tx_delay = 85;
 
         cfg.cycle_scan = 4000;
