@@ -1,4 +1,4 @@
-#define VERSION "1.21"
+#define VERSION "1.3"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -45,7 +45,7 @@ struct peer_t {
    uint8_t lq_tick;
    uint8_t lq;
    int rssi;
-   uint16_t distance;
+   float distance; // --------- uint16_t
    int16_t direction;
    int16_t relalt;
    msp_raw_gps_t gps;
@@ -170,10 +170,7 @@ struct stats_t {
     uint8_t percent_received;
     uint16_t last_tx_duration;
     uint16_t last_rx_duration;
-    uint16_t last_msp_0_duration;
-    uint16_t last_msp_1_duration;
-    uint16_t last_msp_2_duration;
-    uint16_t last_msp_3_duration;
+    uint16_t last_msp_duration[LORA_NODES_MAX];
     uint16_t last_oled_duration;
 };
 

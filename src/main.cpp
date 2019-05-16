@@ -29,8 +29,6 @@ air_type2_t air_2;
 air_type1_t * air_r1;
 air_type2_t * air_r2;
 
-
-
 // -------- SYSTEM
 
 void set_mode(uint8_t mode) {
@@ -55,7 +53,7 @@ void set_mode(uint8_t mode) {
 
         cfg.msp_version = 2;
         cfg.msp_timeout = 100;
-        cfg.msp_fc_timeout = 7000;
+        cfg.msp_fc_timeout = 8000;
         cfg.msp_after_tx_delay = 85;
 
         cfg.cycle_scan = 4000;
@@ -143,7 +141,7 @@ double rad2deg(double rad) {
  * @return The distance between the two points in meters
  */
 
-double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
+double gpsDistanceBetween(double lat1d, double lon1d, double lat2d, double lon2d) {
   double lat1r, lon1r, lat2r, lon2r, u, v;
   lat1r = deg2rad(lat1d);
   lon1r = deg2rad(lon1d);
@@ -152,6 +150,54 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
   u = sin((lat2r - lat1r)/2);
   v = sin((lon2r - lon1r)/2);
   return 2.0 * 6371000 * asin(sqrt(u * u + cos(lat1r) * cos(lat2r) * v * v));
+}
+
+/*
+double gpsDistanceBetween(double lat1, double long1, double lat2, double long2)
+{
+  // returns distance in meters between two positions, both specified
+  // as signed decimal-degrees latitude and longitude. Uses great-circle
+  // distance computation for hypothetical sphere of radius 6372795 meters.
+  // Because Earth is no exact sphere, rounding errors may be up to 0.5%.
+  // Courtesy of Maarten Lamers
+  double delta = radians(long1-long2);
+  double sdlong = sin(delta);
+  double cdlong = cos(delta);
+  lat1 = radians(lat1);
+  lat2 = radians(lat2);
+  double slat1 = sin(lat1);
+  double clat1 = cos(lat1);
+  double slat2 = sin(lat2);
+  double clat2 = cos(lat2);
+  delta = (clat1 * slat2) - (slat1 * clat2 * cdlong);
+  delta = sq(delta);
+  delta += sq(clat2 * sdlong);
+  delta = sqrt(delta);
+  double denom = (slat1 * slat2) + (clat1 * clat2 * cdlong);
+  delta = atan2(delta, denom);
+  return delta * 6372795;
+}
+
+*/
+
+double gpsCourseTo(double lat1, double long1, double lat2, double long2)
+{
+  // returns course in degrees (North=0, West=270) from position 1 to position 2,
+  // both specified as signed decimal-degrees latitude and longitude.
+  // Because Earth is no exact sphere, calculated course may be off by a tiny fraction.
+  // Courtesy of Maarten Lamers
+  double dlon = radians(long2-long1);
+  lat1 = radians(lat1);
+  lat2 = radians(lat2);
+  double a1 = sin(dlon) * cos(lat2);
+  double a2 = sin(lat1) * cos(lat2) * cos(dlon);
+  a2 = cos(lat1) * sin(lat2) - a2;
+  a2 = atan2(a1, a2);
+  if (a2 < 0.0)
+  {
+    a2 += TWO_PI;
+  }
+  return degrees(a2);
 }
 
 // -------- LoRa
@@ -186,6 +232,7 @@ void lora_send() {
             }
     }
     else {
+
         air_0.id = curr.id;
         air_0.type = 0;
         air_0.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
@@ -413,13 +460,14 @@ void display_draw() {
 
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
-        display.drawString(0, 0, "TIMINGS:");
-        display.drawString(0, 10, "LoRa TX");
-        display.drawString(0, 20, "MSP");
-        display.drawString(0, 30, "OLED");
-        display.drawString(0, 40, "Cycles");
-        display.drawString(0, 50, "Uptime");
+        display.drawString(0, 0, "LORA TX");
+        display.drawString(0, 10, "MSP");
+        display.drawString(0, 20, "OLED");
+        display.drawString(0, 30, "CYCLE");
+        display.drawString(0, 40, "SLOTS");
+        display.drawString(0, 50, "UPTIME");
 
+        display.drawString(112, 0, "ms");
         display.drawString(112, 10, "ms");
         display.drawString(112, 20, "ms");
         display.drawString(112, 30, "ms");
@@ -427,10 +475,11 @@ void display_draw() {
         display.drawString(112, 50, "s");
 
         display.setTextAlignment(TEXT_ALIGN_RIGHT);
-        display.drawString (111, 10, String(stats.last_tx_duration));
-        display.drawString (111, 20, String(stats.last_msp_0_duration) + " / " + String(stats.last_msp_1_duration) + " / " + String(stats.last_msp_2_duration) + " / " + String(stats.last_msp_3_duration));
-        display.drawString (111, 30, String(stats.last_oled_duration));
-        display.drawString (111, 40, String(cfg.lora_slot_spacing) + " / " + String(cfg.lora_cycle));
+        display.drawString (111, 0, String(stats.last_tx_duration));
+        display.drawString (111, 10, String(stats.last_msp_duration[0]) + " / " + String(stats.last_msp_duration[1]) + " / " + String(stats.last_msp_duration[2]) + " / " + String(stats.last_msp_duration[3]));
+        display.drawString (111, 20, String(stats.last_oled_duration));
+        display.drawString (111, 30, String(cfg.lora_cycle));
+        display.drawString (111, 40, String(LORA_NODES_MAX) + " x " + String(cfg.lora_slot_spacing));
         display.drawString (111, 50, String((int)millis() / 1000));
 
     }
@@ -507,20 +556,22 @@ void display_draw() {
                     display.drawString (0, 44, "C " + String(peers[i].gpsrec.groundCourse / 10) + "°");
                 }
 
-                if (peers[i].gpsrec.lat != 0 && peers[i].gpsrec.lon != 0 && curr.gps.lat != 0 && curr.gps.lon != 0 && !iscurrent) {
-                    peers[i].distance = distanceEarth(curr.gps.lat / 10000000, curr.gps.lon / 10000000, peers[i].gpsrec.lat / 10000000, peers[i].gpsrec.lon / 10000000);
-                    peers[i].direction = 0;
-                    peers[i].relalt = peers[i].gpsrec.alt - curr.gps.alt;
-                }
-                else {
-                    peers[i].distance = 0;
-                    peers[i].direction = 0;
-                    peers[i].relalt = 0;
-                }
+                if (peers[i].gps.lat != 0 && peers[i].gps.lon != 0 && curr.gps.lat != 0 && curr.gps.lon != 0 && !iscurrent) {
 
-                display.drawString (40, 44, "B " + String(peers[i].direction) + "°");
-                display.drawString (88, 44, "D " + String(peers[i].distance) + "m");
-                display.drawString (0, 54, "R " + String(peers[i].relalt) + "m");
+
+                    double lat1 = curr.gps.lat / 10000000;
+                    double lon1 = curr.gps.lon / 10000000;
+                    double lat2 = peers[i].gpsrec.lat / 10000000;
+                    double lon2 = peers[i].gpsrec.lon / 10000000;
+
+                    peers[i].distance = gpsDistanceBetween(lat1, lon1, lat2, lon2);
+                    peers[i].direction = gpsCourseTo(lat1, lon1, lat2, lon2);
+                    peers[i].relalt = peers[i].gpsrec.alt - curr.gps.alt;
+
+                    display.drawString (40, 44, "B " + String(peers[i].direction) + "°");
+                    display.drawString (88, 44, "D " + String(peers[i].distance) + "m");
+                    display.drawString (0, 54, "R " + String(peers[i].relalt) + "m");
+                }
 
                 if (iscurrent) {
                     display.drawString (40, 54, String((float)curr.fcanalog.vbat / 10) + "v");
@@ -586,19 +637,30 @@ void msp_set_fc() {
   msp.request(MSP_ANALOG, &curr.fcanalog, sizeof(curr.fcanalog));
 }
 
+void msp_send_radar(uint8_t i) {
+    radarPos.id = i;
+    radarPos.state = peers[i].state;
+    radarPos.lat = peers[i].gps.lat; // x 10E7
+    radarPos.lon = peers[i].gps.lon; // x 10E7
+    radarPos.alt = peers[i].gps.alt * 100; // cm
+    radarPos.heading = peers[i].gps.groundCourse / 10; // From ° x 10 to °
+    radarPos.speed = peers[i].gps.groundSpeed; // cm/s
+    radarPos.lq = peers[i].lq;
+    msp.command2(MSP2_COMMON_SET_RADAR_POS , &radarPos, sizeof(radarPos), 0);
+//    msp.command(MSP_SET_RADAR_POS , &radarPos, sizeof(radarPos), 0);
+}
+
 void msp_send_peers() {
     for (int i = 0; i < LORA_NODES_MAX; i++) {
         if (peers[i].id > 0) {
-            radarPos.id = i;
-            radarPos.state = peers[i].state;
-            radarPos.lat = peers[i].gps.lat; // x 10E7
-            radarPos.lon = peers[i].gps.lon; // x 10E7
-            radarPos.alt = peers[i].gps.alt * 100; // cm
-            radarPos.heading = peers[i].gps.groundCourse / 10; // From ° x 10 to °
-            radarPos.speed = peers[i].gps.groundSpeed; // cm/s
-            radarPos.lq = peers[i].lq;
-            msp.command2(MSP2_COMMON_SET_RADAR_POS , &radarPos, sizeof(radarPos), 0);
+            msp_send_radar(i);
         }
+    }
+}
+
+void msp_send_peer(uint8_t peer_id) {
+    if (peers[peer_id].id > 0) {
+        msp_send_radar(peer_id);
     }
 }
 
@@ -772,8 +834,8 @@ void loop() {
         else { // Not alone, sync by slot
             resync_tx_slot(cfg.lora_timing_delay);
         }
-        sys.display_updated = millis();
-        sys.stats_updated = millis();
+        sys.display_updated = sys.lora_next_tx + cfg.lora_cycle - 30;
+        sys.stats_updated = sys.lora_next_tx + cfg.lora_cycle - 15;
 
         sys.pps = 0;
         sys.ppsc = 0;
@@ -781,8 +843,6 @@ void loop() {
         stats.packets_total = 0;
         stats.packets_received = 0;
         stats.percent_received = 0;
-
-//        lanceMSP();
 
         digitalWrite(LED, LOW);
 
@@ -824,8 +884,7 @@ void loop() {
 
         sys.lora_last_tx = millis();
         lora_send();
-        stats.timer_end = millis();
-        stats.last_tx_duration = stats.timer_end - sys.lora_last_tx;
+        stats.last_tx_duration = millis() - sys.lora_last_tx;
 
         // Drift correction
 
@@ -858,71 +917,35 @@ void loop() {
 
         stats.timer_begin = millis();
         display_draw();
-        stats.timer_end = millis();
-        stats.last_oled_duration = stats.timer_end - stats.timer_begin;
+        stats.last_oled_duration = millis() - stats.timer_begin;
         sys.display_updated = sys.now;
     }
 
 // ---------------------- SERIAL / MSP
 
-if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE && sys.phase > MODE_LORA_SYNC) {
+    if (sys.now > sys.msp_next_cycle && curr.host != HOST_NONE && sys.phase > MODE_LORA_SYNC && sys.lora_slot < LORA_NODES_MAX) {
 
         stats.timer_begin = millis();
 
-        switch (sys.lora_slot) {
+        if (sys.lora_slot == 0) {
 
-        case 0: // Between slots 0 and 1
-
-            msp_get_gps();
-
-            if (sys.lora_tick % 4 == 0) {
+            if (sys.lora_tick % 6 == 0) {
                 msp_get_state();
             }
 
-            stats.last_msp_0_duration = millis() - stats.timer_begin;
-
-        break;
-
-        case 1: // Between slots 1 and 2
-
-            if (curr.host == HOST_INAV) {
-                msp_send_peers();
-                delay(5);
-                stats.last_msp_1_duration = millis() - stats.timer_begin;
-            }
-
-            break;
-
-        case 2: // Between slots 2 and 3
-
-            msp_get_gps();
-
-            if ((sys.lora_tick + 1) % 4 == 0) {
+            if ((sys.lora_tick + 1) % 6 == 0) {
                 msp_get_fcanalog();
             }
 
-            stats.last_msp_2_duration = millis() - stats.timer_begin;
-
-        break;
-
-        case 3: // Between slots 3 and 0/4
-
-            if (curr.host == HOST_INAV) {
-                msp_send_peers();
-                delay(5);
-                stats.last_msp_3_duration = millis() - stats.timer_begin;
-            }
-
-        break;
-
-
-        default:
-
-        break;
         }
 
+        msp_get_gps(); // GPS > FC > ESP
+        msp_send_peer(sys.lora_slot); // ESP > FC > OSD
+
+        stats.last_msp_duration[sys.lora_slot] = millis() - stats.timer_begin;
         sys.msp_next_cycle += cfg.lora_slot_spacing;
         sys.lora_slot++;
+
     }
 
 
@@ -933,7 +956,7 @@ if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE 
         sys.pps = sys.ppsc;
         sys.ppsc = 0;
 
-        // Pausing the timed-out peers + LQ computation
+        // Timed-out peers + LQ
 
         for (int i = 0; i < LORA_NODES_MAX; i++) {
 
@@ -946,8 +969,6 @@ if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE 
 
             if (peers[i].id > 0 && ((sys.now - peers[i].updated) > cfg.lora_peer_timeout)) {
                 peers[i].lost = 1;
-                // peers[i].id = 0;
-                // sys.last_rssi = 0;
             }
 
         }
@@ -980,7 +1001,7 @@ if (sys.now > sys.msp_next_cycle && sys.lora_slot < 4 && curr.host != HOST_NONE 
     sys.stats_updated = sys.now;
     }
 
-    
+
     // LED blinker
 
     if (sys.lora_tick % 6 == 0) {
