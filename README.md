@@ -165,6 +165,10 @@ The HUD has an entry in the stick menu (OSD->HUD) where you can change this conf
 
 Optional OSD and HUD cli settings:
 ```
+osd_layout 0 2 0 0 V       
+osd_layout 0 43 0 0 H      
+osd_layout 0 44 0 0 H      
+osd_layout 0 45 0 0 H 
 set osd_crosshairs_style = TYPE6
 set osd_horizon_offset = 0
 set osd_camera_uptilt = 0
@@ -172,7 +176,7 @@ set osd_camera_fov_h = 135
 set osd_camera_fov_v = 85
 set osd_hud_margin_h = 1
 set osd_hud_margin_v = 3
-set osd_hud_homing = OFF
+set osd_hud_homing = ON
 set osd_hud_homepoint = ON
 set osd_hud_radar_disp = 4
 set osd_hud_radar_range_min = 1
