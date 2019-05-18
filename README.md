@@ -64,6 +64,7 @@ If you feel brave engough to be a tester, just ask us in the Facebook group. [Co
 [FC settings](#FC-settings)
 
 [ESP32 commands](#commands)
+
 [Manual flashing ESP](#manual)
 
 [Contact](#contact)
@@ -96,7 +97,7 @@ INAV-Radar is a experimental firmware based on INAV and soon will become a part 
 
 ## ESP32 firmware flashing
 
-With the installer (Only Windows at the moment):
+With the installer (Only Windows at the moment, for Linux / Mac os user see "Manual flashing" (bottom of page) 
 
 For testing there is no need to install Atom and PlatformIO, just use the [ESP32 firmware installer](https://github.com/KingKone/INAV-Radar_Installer/releases) for flashing.
 
