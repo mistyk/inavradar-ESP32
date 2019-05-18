@@ -12,6 +12,14 @@ ESP32 Firmware Installer: [Download](https://github.com/KingKone/INAV-Radar_Inst
 
 RCgroups thread: [INAV-Radar on RCgroups](https://www.rcgroups.com/forums/showthread.php?3304673-iNav-Radar-ESP32-LoRa-modems)
 
+*** 1.30 (2019/05/18)
+
+    Radar logo at boot
+    Better timings, greatly reduced display latency
+    Many cosmetic tweaks and fixes
+    Newest inav 2.2.dev REQUIRED (built 2019/05/18 or newer)
+
+
 *** 1.20 (2019/05/14)
 
     Better timing for MSP and air packets
@@ -83,7 +91,7 @@ It's developed using [PlatformIO](https://platformio.org/) plugin for [Atom](htt
 - INAV OSD part repo is found [here](https://github.com/OlivierC-FR/inav/tree/oc_hud).
 It's a fork from the INAV repo and instructions how to build can be found [here](https://github.com/iNavFlight/inav/blob/master/docs/development/Building%20in%20Docker.md).
 
-INAV-Radar is a experimental firmware based on INAV and is currently no part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
+INAV-Radar is a experimental firmware based on INAV and soon will become a part of the INAV flight control software. INAV repo can be found [here](https://github.com/iNavFlight/inav).
 
 ## ESP32 firmware flashing
 
