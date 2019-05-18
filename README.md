@@ -64,6 +64,7 @@ If you feel brave engough to be a tester, just ask us in the Facebook group. [Co
 [FC settings](#FC-settings)
 
 [ESP32 commands](#commands)
+[Manual flashing ESP](#manual)
 
 [Contact](#contact)
 
@@ -98,49 +99,6 @@ INAV-Radar is a experimental firmware based on INAV and soon will become a part 
 With the installer (Only Windows at the moment):
 
 For testing there is no need to install Atom and PlatformIO, just use the [ESP32 firmware installer](https://github.com/KingKone/INAV-Radar_Installer/releases) for flashing.
-
-Manual method:
-
-Your system may needs the driver for the USB UART bridge:
-[Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
- or [Alternative MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
-
-You will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
-
-Be sure to check 'Add Python to PATH':
-
-The latest stable esptool.py release can be installed via pip in your command prompt:
-
-Windows:
-```
-c:\> pip install esptool
-```
-
-MacOS:
-```
-$ pip3 install esptool
-```
-
-Download the air-to-air test firmware from the [releases page](https://github.com/mistyk/inavradar-ESP32/releases)
-and extract it. Run this command to flash it onto your ESP32 Lora module (Windows and MacOS):
-
-You may change the --port to match your operating system. If you are using Windows check the [device manager](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/devManager.PNG).
-
-Windows:
-```
-c:\> cd (your air-to-air directory here)
-c:\> esptool.py --port COM11 write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
-```
-
-MacOS:
-```
-$ cd (your air-to-air directory here)
-$ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
-
-```
-
-The output should look something like this:
-![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
 
 ## Wireing
 
@@ -217,3 +175,47 @@ rfp                     - Send fake plane via radio
 movefakeplanes          - Move fake plane
 mfp                     - Move fake plane
 ```
+
+
+## Manual Flashing ESP method:
+
+Your system may needs the driver for the USB UART bridge:
+[Windows+MacOS](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
+ or [Alternative MacOS](https://github.com/adrianmihalko/ch340g-ch34g-ch34x-mac-os-x-driver)
+
+You will need [Python 3.4 or newer](https://www.python.org/downloads/) installed on your system.
+
+Be sure to check 'Add Python to PATH':
+
+The latest stable esptool.py release can be installed via pip in your command prompt:
+
+Windows:
+```
+c:\> pip install esptool
+```
+
+MacOS:
+```
+$ pip3 install esptool
+```
+
+Download the air-to-air test firmware from the [releases page](https://github.com/mistyk/inavradar-ESP32/releases)
+and extract it. Run this command to flash it onto your ESP32 Lora module (Windows and MacOS):
+
+You may change the --port to match your operating system. If you are using Windows check the [device manager](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/devManager.PNG).
+
+Windows:
+```
+c:\> cd (your air-to-air directory here)
+c:\> esptool.py --port COM11 write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
+```
+
+MacOS:
+```
+$ cd (your air-to-air directory here)
+$ esptool.py --port /dev/tty.SLAB_USBtoUART write_flash -z --flash_mode dio 0x1000 bootloader_dio_40m.bin 0x8000 default.bin 0xe000 boot_app0.bin 0x10000 firmware.bin
+
+```
+
+The output should look something like this:
+![Windows CMD output](https://github.com/mistyk/inavradar-ESP32/raw/master/docs/cmd.PNG)
