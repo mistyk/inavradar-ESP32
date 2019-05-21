@@ -80,8 +80,8 @@ struct air_type1_t { // 80 bits
     signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
     signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
     unsigned int alt : 13; // 0 to +8192m 
-    unsigned int speed : 6; //0 to 64m/s 230km/h
-    unsigned int broadcast : 3; // Not in use	
+    unsigned int speed : 6; // 0 to 64m/s 230km/h
+    unsigned int broadcast : 3; 
 };
 
 struct air_type2_t { // 80 bits

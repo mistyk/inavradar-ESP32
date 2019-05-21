@@ -177,7 +177,25 @@ void lora_set_mode(uint8_t mode) {
 
     switch (mode) {
 
-    case 1 : // SF7 250 6 x 50 = 300
+    case 0 : // SF9 250 SILENT NO TX
+
+        cfg.lora_spreading_factor = 9;
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 5;
+
+        cfg.lora_slot_spacing = 125;
+        cfg.lora_nodes_max = 4;
+
+        cfg.lora_timing_delay = -60;
+        cfg.lora_peer_timeout = 6000;
+        cfg.msp_after_tx_delay = 85;
+
+        sys.lora_no_tx = 1; 
+        
+        break;    
+    
+    
+    case 1 : // SF7 250 6 x 60 = 360
 
         cfg.lora_spreading_factor = 7;
         cfg.lora_bandwidth = 250000;
@@ -187,8 +205,8 @@ void lora_set_mode(uint8_t mode) {
         cfg.lora_nodes_max = 6;
 
         cfg.lora_timing_delay = -30;
-        cfg.lora_peer_timeout = 3000;
-        cfg.msp_after_tx_delay = 24;
+        cfg.lora_peer_timeout = 4000;
+        cfg.msp_after_tx_delay = 20;
 
         break;
 
@@ -203,28 +221,29 @@ void lora_set_mode(uint8_t mode) {
 
         cfg.lora_timing_delay = -60;
         cfg.lora_peer_timeout = 6000;
-        cfg.msp_after_tx_delay = 85;
+        cfg.msp_after_tx_delay = 75;
 
         break;
 
-    case 3 : // SF10 250 4 x 250 = 1000
+    case 3 : // SF10 250 3 x 300 = 1000
 
         cfg.lora_spreading_factor = 10;
         cfg.lora_bandwidth = 250000;
         cfg.lora_coding_rate = 6;
 
-        cfg.lora_slot_spacing = 250;
-        cfg.lora_nodes_max = 4;
+        cfg.lora_slot_spacing = 300;
+        cfg.lora_nodes_max = 3;
 
         cfg.lora_timing_delay = -60;
         cfg.lora_peer_timeout = 8000;
-        cfg.msp_after_tx_delay = 180;
+        cfg.msp_after_tx_delay = 170;
 
         break;
     }
 
     cfg.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
     cfg.cycle_stats = cfg.lora_cycle * 2;
+
     cfg.lora_power = 20;
     cfg.msp_timeout = 100;
     cfg.msp_fc_timeout = 4000;
@@ -361,9 +380,9 @@ void lora_receive(int packetSize) {
 
     sys.num_peers = count_peers();
 
-    if ((sys.air_last_received_id == curr.id) && (sys.phase > MODE_LORA_SYNC) && !sys.lora_no_tx) { // Same slot, conflict
+    if ((sys.air_last_received_id == curr.id) && (sys.phase > MODE_LORA_SYNC) && !sys.lora_no_tx) { // Slot conflict
         uint32_t cs1 = peers[id].name[0] + peers[id].name[1] * 26 + peers[id].name[2] * 26 * 26 ;
-        uint32_t cs2 = curr.name[0] + curr.name[1] * 26 + curr.name[2] * 26 * 26;
+        uint32_t cs2 = curr.name[0] + curr.name[1] * 26 + curr.name[2] * 26 * 26 + 1;
         if (cs1 < cs2) { // Pick another slot
             sprintf(sys.message, "%s", "ID CONFLICT");
             pick_id();
@@ -439,11 +458,18 @@ void display_draw() {
         display.drawString (55, 23, String(host_name[curr.host]));
         display.drawString (55, 44, "R" + String(cfg.lora_air_mode));
 
-
+/*
         if (sys.air_last_received_id > 0) {
             display.drawString (36 + sys.air_last_received_id * 8, 54, String(peer_slotname[sys.air_last_received_id]));
         }
+*/
+        for (int i = 0; i < cfg.lora_nodes_max; i++) {   
 
+            if (peers[i].id > 0 && peers[i].updated > millis() - cfg.lora_cycle) {
+                display.drawString (44 + i * 8, 54, String(peer_slotname[peers[i].id]));
+            }    
+        }    
+        
         display.drawString (15, 44, "Nod/" + String(cfg.lora_nodes_max));
 
         if (curr.gps.fixType == 1) display.drawString (27, 12, "2D");
@@ -539,7 +565,6 @@ void display_draw() {
     }
     else if (sys.display_page >= 3) {
 
-  //      int i = constrain(sys.display_page + 1 - cfg.lora_nodes_max, 0, cfg.lora_nodes_max - 1);
         int i = constrain(sys.display_page - 3, 0, cfg.lora_nodes_max - 1);
         bool iscurrent = (i + 1 == curr.id);
 
@@ -564,7 +589,7 @@ void display_draw() {
 
             if (peers[i].lost && !iscurrent) { display.drawString (19, 0, "LOST"); }
                 else if (peers[i].lq == 0 && !iscurrent) { display.drawString (19, 0, "x"); }
-                /* else if (peers[i].lq == 1) { display.drawXbm(19, 2, 8, 8, icon_lq_1); } */
+                else if (peers[i].lq == 1) { display.drawXbm(19, 2, 8, 8, icon_lq_1); }
                 else if (peers[i].lq == 2) { display.drawXbm(19, 2, 8, 8, icon_lq_2); }
                 else if (peers[i].lq == 3) { display.drawXbm(19, 2, 8, 8, icon_lq_3); }
                 else if (peers[i].lq == 4) { display.drawXbm(19, 2, 8, 8, icon_lq_4); }
@@ -745,8 +770,8 @@ void IRAM_ATTR handleInterrupt() {
             sys.menu_line++;
             sys.menu_begin = millis();
             display.clear();
-            if (sys.menu_line > 4) {
-            sys.menu_line = 1;
+            if (sys.menu_line > 3) {
+            sys.menu_line = 0;
             }
         }
 
@@ -768,10 +793,6 @@ void setup() {
     display_init();
     display_logo();
 
-//            lora_set_mode(cfg.lora_air_mode);
-//lora_set_mode(2);
-//            lora_init();    
-    
     msp.begin(Serial1);
     Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
     reset_peers();
@@ -809,17 +830,11 @@ void loop() {
 
         if (sys.now > (sys.menu_begin + sys.menu_timeout)) {  // End of the menu
 
-            if (sys.menu_line == 4) {
-                cfg.lora_air_mode = 2;
-                sys.lora_no_tx = 1;
-            }
-            else {
-                cfg.lora_air_mode = sys.menu_line;
-            }
+            cfg.lora_air_mode = sys.menu_line;
 
             lora_set_mode(cfg.lora_air_mode);
-            lora_init();    
-            
+            lora_init();
+
             display.clear();
             display.drawString(0, 0, "RADAR VERSION");
             display.drawString(90, 0, VERSION);
@@ -842,41 +857,34 @@ void loop() {
                 display.drawString (33, 0, "Speed");
                 display.drawString (69, 0, "Range");
                 display.drawString (107, 0, "Max");
-
-                display.drawString (6, 12, "R1");
-                display.drawString (6, 24, "R2");
-                display.drawString (6, 36, "R3");
-                display.drawString (6, 48, "R2 Silent");
-
-                display.drawXbm (36, 13, 8, 8, icon_sq1);
-                display.drawXbm (44, 13, 8, 8, icon_sq1);
-                display.drawXbm (52, 13, 8, 8, icon_sq1);
-
+                display.drawString (6, 12, "R0 Silent");
+                display.drawString (6, 24, "R1");
+                display.drawString (6, 36, "R2");
+                display.drawString (6, 48, "R3");
+                
                 display.drawXbm (36, 25, 8, 8, icon_sq1);
                 display.drawXbm (44, 25, 8, 8, icon_sq1);
-//                display.drawXbm (52, 25, 8, 8, icon_sq0);
-
+                display.drawXbm (52, 25, 8, 8, icon_sq1);
+                
                 display.drawXbm (36, 37, 8, 8, icon_sq1);
-//                display.drawXbm (44, 37, 8, 8, icon_sq0);
-//                display.drawXbm (52, 37, 8, 8, icon_sq0);
-
-                display.drawXbm (70, 13, 8, 8, icon_sq1);
-//                display.drawXbm (78, 13, 8, 8, icon_sq0);
-//                display.drawXbm (86, 13, 8, 8, icon_sq0);
-
+                display.drawXbm (44, 37, 8, 8, icon_sq1);
+                
+                display.drawXbm (36, 49, 8, 8, icon_sq1);
+                
                 display.drawXbm (70, 25, 8, 8, icon_sq1);
-                display.drawXbm (78, 25, 8, 8, icon_sq1);
-//                display.drawXbm (86, 25, 8, 8, icon_sq0);
-
+                
                 display.drawXbm (70, 37, 8, 8, icon_sq1);
                 display.drawXbm (78, 37, 8, 8, icon_sq1);
-                display.drawXbm (86, 37, 8, 8, icon_sq1);
-
-                display.drawString (116, 12, "8");
-                display.drawString (116, 24, "4");
+                
+                display.drawXbm (70, 49, 8, 8, icon_sq1);
+                display.drawXbm (78, 49, 8, 8, icon_sq1);
+                display.drawXbm (86, 49, 8, 8, icon_sq1);
+                
+                display.drawString (116, 24, "6");
                 display.drawString (116, 36, "4");
+                display.drawString (116, 48, "3");
 
-                display.drawRect(0, sys.menu_line * 12, 127, 12);
+                display.drawRect(0, (sys.menu_line + 1) * 12, 127, 12);
 
                 display.display();
                 sys.display_updated = millis();
@@ -916,9 +924,7 @@ void loop() {
 
             display.drawProgressBar(0, 53, 40, 6, 100);
             display.display();
-     
-//            delay (2000);
-            
+
             LoRa.sleep();
             LoRa.receive();
 
@@ -933,14 +939,12 @@ void loop() {
             if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
 
                 delay(50);
-                
+
                 msp_set_fc();
 
                 display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - sys.cycle_scan_begin) / cfg.msp_fc_timeout);
                 display.display();
                 sys.display_updated = millis();
-                
-                
             }
         }
     }
@@ -948,6 +952,7 @@ void loop() {
 // ---------------------- LORA INIT
 
     if (sys.phase == MODE_LORA_INIT) {
+
         if (sys.now > (sys.cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
 
             sys.num_peers = count_peers();
@@ -962,6 +967,7 @@ void loop() {
             sys.phase = MODE_LORA_SYNC;
 
         } else { // Still scanning
+
             if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
                 for (int i = 0; i < cfg.lora_nodes_max; i++) {
                     if (peers[i].id > 0) {
@@ -1013,16 +1019,10 @@ void loop() {
         }
         else {
 
-/*            if (sys.num_peers_active == 0) {
-                sys.lora_next_tx += 3 * cfg.lora_cycle;
-                sprintf(sys.message, "%s", "SLOW MODE");
-            }
+            if (sys.num_peers == 0) {
+                sys.lora_next_tx += random(0, 2) * cfg.lora_slot_spacing;
+                }
 
-            if (sys.num_peers == 0) { //
-                sys.lora_next_tx += random(-1, 1) * cfg.lora_slot_spacing;
-                sprintf(sys.message, "%s", "SLOW MODE + RAND");
-            }
-*/
             sys.phase = MODE_LORA_TX;
         }
 
@@ -1078,17 +1078,17 @@ void loop() {
 
         if (sys.num_peers == 0 && sys.display_page == 1)  { // No need for timings graphs when alone
             sys.display_page++;
-        }        
-        
+        }
+
         if (sys.display_page >= (3 + cfg.lora_nodes_max)) {
             sys.display_page = 0;
-        }        
-        
+        }
+
         display_draw();
-        
+
         sys.air_last_received_id = 0;
         sys.message[0] = 0;
-        
+
         stats.last_oled_duration = millis() - stats.timer_begin;
         sys.display_updated = sys.now;
     }
@@ -1145,6 +1145,9 @@ void loop() {
         }
 
         sys.num_peers_active = count_peers(1);
+
+//        sys.lora_slow_mode = (sys.num_peers_active == 0) ? 1 : 0;
+
         stats.packets_total += sys.num_peers_active * cfg.cycle_stats / cfg.lora_cycle;
         stats.packets_received += sys.pps;
         stats.percent_received = (stats.packets_received > 0) ? constrain(100 * stats.packets_received / stats.packets_total, 0 ,100) : 0;
