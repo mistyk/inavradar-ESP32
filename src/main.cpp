@@ -34,43 +34,9 @@ air_type3_t * air_r3;
 
 // -------- SYSTEM
 
-void set_mode(uint8_t mode) {
-
-    switch (mode) {
-
-    case 0 : // SF9 250
-        cfg.lora_frequency = 433E6; // 433E6, 868E6, 915E6
-        cfg.lora_bandwidth = 250000;
-        cfg.lora_coding_rate = 5;
-        cfg.lora_spreading_factor = 9;
-        cfg.lora_power = 20;
-        cfg.lora_slot_spacing = 125;
-        cfg.lora_nodes_max = LORA_NODES_MAX;
-        cfg.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
-        cfg.lora_timing_delay = -60;
-        cfg.lora_antidrift_threshold = 5;
-        cfg.lora_antidrift_correction = 5;
-        cfg.lora_peer_timeout = 6000;
-
-//        cfg.lora_air_mode = LORA_NODES_MIN;
-
-        cfg.msp_version = 2;
-        cfg.msp_timeout = 100;
-        cfg.msp_fc_timeout = 6000;
-        cfg.msp_after_tx_delay = 85;
-
-        cfg.cycle_scan = 4000;
-        cfg.cycle_display = 250;
-        cfg.cycle_stats = 1000;
-
-        break;
-
-    }
-}
-
 int count_peers(bool active = 0) {
     int j = 0;
-    for (int i = 0; i < LORA_NODES_MAX; i++) {
+    for (int i = 0; i < cfg.lora_nodes_max; i++) {
         if (active == 1) {
             if ((peers[i].id > 0) && !peers[i].lost) {
                 j++;
@@ -87,7 +53,7 @@ int count_peers(bool active = 0) {
 
 void reset_peers() {
     sys.now_sec = millis();
-    for (int i = 0; i < LORA_NODES_MAX; i++) {
+    for (int i = 0; i < cfg.lora_nodes_max; i++) {
         peers[i].id = 0;
         peers[i].host = 0;
         peers[i].state = 0;
@@ -107,7 +73,7 @@ void reset_peers() {
 
 void pick_id() {
     curr.id = 0;
-    for (int i = 0; i < LORA_NODES_MAX; i++) {
+    for (int i = 0; i < cfg.lora_nodes_max; i++) {
         if ((peers[i].id == 0) && (curr.id == 0)) {
             curr.id = i + 1;
         }
@@ -116,7 +82,7 @@ void pick_id() {
 
 void resync_tx_slot(int16_t delay) {
     bool startnow = 0;
-    for (int i = 0; (i < LORA_NODES_MAX) && (startnow == 0); i++) { // Resync
+    for (int i = 0; (i < cfg.lora_nodes_max) && (startnow == 0); i++) { // Resync
         if (peers[i].id > 0) {
             sys.lora_next_tx = peers[i].updated + (curr.id - peers[i].id) * cfg.lora_slot_spacing + cfg.lora_cycle + delay;
             startnow = 1;
@@ -204,6 +170,71 @@ double gpsCourseTo(double lat1, double long1, double lat2, double long2)
 }
 
 // -------- LoRa
+
+void lora_set_mode(uint8_t mode) {
+
+    cfg.lora_frequency = 433E6; // 433E6, 868E6, 915E6
+
+    switch (mode) {
+
+    case 1 : // SF7 250 6 x 50 = 300
+
+        cfg.lora_spreading_factor = 7;
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 5;
+
+        cfg.lora_slot_spacing = 60;
+        cfg.lora_nodes_max = 6;
+
+        cfg.lora_timing_delay = -30;
+        cfg.lora_peer_timeout = 3000;
+        cfg.msp_after_tx_delay = 24;
+
+        break;
+
+    case 2 : // SF9 250 4 x 125 = 500
+
+        cfg.lora_spreading_factor = 9;
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 5;
+
+        cfg.lora_slot_spacing = 125;
+        cfg.lora_nodes_max = 4;
+
+        cfg.lora_timing_delay = -60;
+        cfg.lora_peer_timeout = 6000;
+        cfg.msp_after_tx_delay = 85;
+
+        break;
+
+    case 3 : // SF10 250 4 x 250 = 1000
+
+        cfg.lora_spreading_factor = 10;
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 6;
+
+        cfg.lora_slot_spacing = 250;
+        cfg.lora_nodes_max = 4;
+
+        cfg.lora_timing_delay = -60;
+        cfg.lora_peer_timeout = 8000;
+        cfg.msp_after_tx_delay = 180;
+
+        break;
+    }
+
+    cfg.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
+    cfg.cycle_stats = cfg.lora_cycle * 2;
+    cfg.lora_power = 20;
+    cfg.msp_timeout = 100;
+    cfg.msp_fc_timeout = 4000;
+    cfg.cycle_display = 250;
+    cfg.cycle_scan = 4000;
+
+    cfg.lora_antidrift_threshold = 5;
+    cfg.lora_antidrift_correction = 5;
+
+}
 
 void lora_send() {
 
@@ -378,7 +409,6 @@ void display_init() {
 
 void display_draw() {
     display.clear();
-
     int j = 0;
     int line;
 
@@ -391,9 +421,6 @@ void display_draw() {
         display.drawString (125, 11, String(peer_slotname[curr.id]));
 
         display.setFont(ArialMT_Plain_10);
-
-//        display.drawString (83, 44, String(cfg.lora_cycle) + "ms");
-//        display.drawString (105, 23, String(cfg.lora_nodes_max));
 
         display.drawString (126, 29, "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ");
         display.drawString (107, 44, String(stats.percent_received));
@@ -410,6 +437,8 @@ void display_draw() {
         display.drawString(21, 54, String(sys.pps) + "p/s");
         display.drawString (109, 54, "dB");
         display.drawString (55, 23, String(host_name[curr.host]));
+        display.drawString (55, 44, "R" + String(cfg.lora_air_mode));
+
 
         if (sys.air_last_received_id > 0) {
             display.drawString (36 + sys.air_last_received_id * 8, 54, String(peer_slotname[sys.air_last_received_id]));
@@ -431,7 +460,7 @@ void display_draw() {
         long pos[LORA_NODES_MAX];
         long diff;
 
-        for (int i = 0; i < LORA_NODES_MAX ; i++) {
+        for (int i = 0; i < cfg.lora_nodes_max ; i++) {
             if (peers[i].id > 0 && !peers[i].lost) {
                 diff = sys.lora_last_tx - peers[i].updated;
                 if (diff > 0 && diff < cfg.lora_cycle) {
@@ -445,7 +474,7 @@ void display_draw() {
 
         int rect_l = stats.last_tx_duration * 128 / cfg.lora_cycle;
 
-        for (int i = 0; i < LORA_NODES_MAX; i++) {
+        for (int i = 0; i < cfg.lora_nodes_max; i++) {
 
             display.setTextAlignment (TEXT_ALIGN_LEFT);
 
@@ -504,13 +533,14 @@ void display_draw() {
         display.drawString (111, 10, String(stats.last_msp_duration[0]) + " / " + String(stats.last_msp_duration[1]) + " / " + String(stats.last_msp_duration[2]) + " / " + String(stats.last_msp_duration[3]));
         display.drawString (111, 20, String(stats.last_oled_duration));
         display.drawString (111, 30, String(cfg.lora_cycle));
-        display.drawString (111, 40, String(LORA_NODES_MAX) + " x " + String(cfg.lora_slot_spacing));
+        display.drawString (111, 40, String(cfg.lora_nodes_max) + " x " + String(cfg.lora_slot_spacing));
         display.drawString (111, 50, String((int)millis() / 1000));
 
     }
     else if (sys.display_page >= 3) {
 
-        int i = constrain(sys.display_page + 1 - LORA_NODES_MAX, 0, LORA_NODES_MAX - 1);
+  //      int i = constrain(sys.display_page + 1 - cfg.lora_nodes_max, 0, cfg.lora_nodes_max - 1);
+        int i = constrain(sys.display_page - 3, 0, cfg.lora_nodes_max - 1);
         bool iscurrent = (i + 1 == curr.id);
 
         display.setFont(ArialMT_Plain_24);
@@ -534,13 +564,13 @@ void display_draw() {
 
             if (peers[i].lost && !iscurrent) { display.drawString (19, 0, "LOST"); }
                 else if (peers[i].lq == 0 && !iscurrent) { display.drawString (19, 0, "x"); }
-                else if (peers[i].lq == 1) { display.drawXbm(19, 2, 8, 8, icon_lq_1); }
+                /* else if (peers[i].lq == 1) { display.drawXbm(19, 2, 8, 8, icon_lq_1); } */
                 else if (peers[i].lq == 2) { display.drawXbm(19, 2, 8, 8, icon_lq_2); }
                 else if (peers[i].lq == 3) { display.drawXbm(19, 2, 8, 8, icon_lq_3); }
                 else if (peers[i].lq == 4) { display.drawXbm(19, 2, 8, 8, icon_lq_4); }
 
                 if (iscurrent) {
-                    display.drawString (19, 0, "<HOST>");
+                    display.drawString (19, 0, "HOST");
                     display.drawString (19, 12, String(host_name[curr.host]));
                 }
                 else {
@@ -612,19 +642,18 @@ void display_draw() {
         }
         else {
             display.drawString (35, 7, "SLOT IS EMPTY");
+            sys.display_page++;
         }
 
     }
 
-    sys.air_last_received_id = 0;
-    sys.message[0] = 0;
     display.display();
 }
 
 void display_logo() {
     display.drawXbm(0, 0, logo_width_s, logo_height_s, logo_bits_s);
     display.display();
-    delay(2000);
+    delay(1200);
     display.clear();
 }
 
@@ -636,7 +665,6 @@ void msp_get_state() {
     uint32_t planeModes;
     msp.getActiveModes(&planeModes);
     curr.state = bitRead(planeModes, 0);
-
 }
 
 void msp_get_name() {
@@ -683,7 +711,7 @@ void msp_send_radar(uint8_t i) {
 }
 
 void msp_send_peers() {
-    for (int i = 0; i < LORA_NODES_MAX; i++) {
+    for (int i = 0; i < cfg.lora_nodes_max; i++) {
         if (peers[i].id > 0) {
             msp_send_radar(i);
         }
@@ -710,15 +738,18 @@ void IRAM_ATTR handleInterrupt() {
     if (sys.io_button_pressed == 0) {
         sys.io_button_pressed = 1;
 
-        if (sys.display_page >= 3 + LORA_NODES_MAX) {
-            sys.display_page = 0;
-        }
-        else {
+        if (sys.phase > MODE_LORA_SYNC) {
             sys.display_page++;
         }
-        if (sys.num_peers == 0 && sys.display_page == 1)  { // No need for timings graphs when alone
-            sys.display_page++;
+        else if (sys.phase == MODE_MENU) {
+            sys.menu_line++;
+            sys.menu_begin = millis();
+            display.clear();
+            if (sys.menu_line > 4) {
+            sys.menu_line = 1;
+            }
         }
+
         sys.io_button_released = millis();
     }
     portEXIT_CRITICAL_ISR(&mux);
@@ -729,15 +760,18 @@ void IRAM_ATTR handleInterrupt() {
 
 void setup() {
 
-    set_mode(LORA_PERF_MODE);
+    sys.phase = MODE_START;
+
+    pinMode(LED, OUTPUT);
+    sys.io_led_blink = 0;
 
     display_init();
     display_logo();
 
-    display.drawString(0, 0, "RADAR VERSION");
-    display.drawString(90, 0, VERSION);
-
-    lora_init();
+//            lora_set_mode(cfg.lora_air_mode);
+//lora_set_mode(2);
+//            lora_init();    
+    
     msp.begin(Serial1);
     Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
     reset_peers();
@@ -746,20 +780,14 @@ void setup() {
     sys.io_button_pressed = 0;
     attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
-    display.drawString (0, 9, "HOST");
+    display.clear();
     display.display();
 
     sys.display_updated = 0;
-    sys.cycle_scan_begin = millis();
+    sys.menu_line = LORA_AIR_MODE_DEFAULT;
+    sys.menu_begin = millis();
 
-    sys.io_led_blink = 0;
-
-    pinMode(LED, OUTPUT);
-    digitalWrite(LED, HIGH);
-
-    curr.host = HOST_NONE;
-
-    sys.phase = MODE_HOST_SCAN;
+    sys.phase = MODE_MENU;
 }
 
 // ----------------------------------------------------------------------------- MAIN LOOP
@@ -774,10 +802,93 @@ void loop() {
         sys.io_button_pressed = 0;
     }
 
+
+// ---------------------- MENU
+
+    if (sys.phase == MODE_MENU) {
+
+        if (sys.now > (sys.menu_begin + sys.menu_timeout)) {  // End of the menu
+
+            if (sys.menu_line == 4) {
+                cfg.lora_air_mode = 2;
+                sys.lora_no_tx = 1;
+            }
+            else {
+                cfg.lora_air_mode = sys.menu_line;
+            }
+
+            lora_set_mode(cfg.lora_air_mode);
+            lora_init();    
+            
+            display.clear();
+            display.drawString(0, 0, "RADAR VERSION");
+            display.drawString(90, 0, VERSION);
+            display.drawString(0, 9, "HOST");
+            display.display();
+
+            sys.cycle_scan_begin = millis();
+            sys.now = millis();
+
+            curr.host = HOST_NONE;
+            sys.phase = MODE_HOST_SCAN;
+
+        }
+        else { // Still in the menu
+            if (sys.now > sys.display_updated + cfg.cycle_display / 5) {
+                delay(50);
+
+                display.drawProgressBar(0, 2, 25, 6, 100 * (millis() - sys.menu_begin) / sys.menu_timeout);
+
+                display.drawString (33, 0, "Speed");
+                display.drawString (69, 0, "Range");
+                display.drawString (107, 0, "Max");
+
+                display.drawString (6, 12, "R1");
+                display.drawString (6, 24, "R2");
+                display.drawString (6, 36, "R3");
+                display.drawString (6, 48, "R2 Silent");
+
+                display.drawXbm (36, 13, 8, 8, icon_sq1);
+                display.drawXbm (44, 13, 8, 8, icon_sq1);
+                display.drawXbm (52, 13, 8, 8, icon_sq1);
+
+                display.drawXbm (36, 25, 8, 8, icon_sq1);
+                display.drawXbm (44, 25, 8, 8, icon_sq1);
+//                display.drawXbm (52, 25, 8, 8, icon_sq0);
+
+                display.drawXbm (36, 37, 8, 8, icon_sq1);
+//                display.drawXbm (44, 37, 8, 8, icon_sq0);
+//                display.drawXbm (52, 37, 8, 8, icon_sq0);
+
+                display.drawXbm (70, 13, 8, 8, icon_sq1);
+//                display.drawXbm (78, 13, 8, 8, icon_sq0);
+//                display.drawXbm (86, 13, 8, 8, icon_sq0);
+
+                display.drawXbm (70, 25, 8, 8, icon_sq1);
+                display.drawXbm (78, 25, 8, 8, icon_sq1);
+//                display.drawXbm (86, 25, 8, 8, icon_sq0);
+
+                display.drawXbm (70, 37, 8, 8, icon_sq1);
+                display.drawXbm (78, 37, 8, 8, icon_sq1);
+                display.drawXbm (86, 37, 8, 8, icon_sq1);
+
+                display.drawString (116, 12, "8");
+                display.drawString (116, 24, "4");
+                display.drawString (116, 36, "4");
+
+                display.drawRect(0, sys.menu_line * 12, 127, 12);
+
+                display.display();
+                sys.display_updated = millis();
+            }
+        }
+    }
+
 // ---------------------- HOST SCAN
 
     if (sys.phase == MODE_HOST_SCAN) {
-            if ((sys.now > (sys.cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
+
+        if ((sys.now > (sys.cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
 
             if (curr.host != HOST_NONE) {
                 msp_get_name();
@@ -795,6 +906,7 @@ void loop() {
             curr.gps.lon = 0;
             curr.gps.alt = 0;
             curr.id = 0;
+
             if (curr.host > 0) {
                 display.drawString (35, 9, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
             }
@@ -803,24 +915,32 @@ void loop() {
             }
 
             display.drawProgressBar(0, 53, 40, 6, 100);
-            display.drawString (0, 18, "SCAN");
             display.display();
-
+     
+//            delay (2000);
+            
             LoRa.sleep();
             LoRa.receive();
+
+            display.drawProgressBar(0, 53, 40, 6, 100);
+            display.drawString (0, 18, "SCAN R" + String(cfg.lora_air_mode));
+            display.display();
 
             sys.cycle_scan_begin = millis();
             sys.phase = MODE_LORA_INIT;
 
         } else { // Still scanning
-            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) && sys.display_enable) {
+            if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
 
                 delay(50);
+                
                 msp_set_fc();
 
                 display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - sys.cycle_scan_begin) / cfg.msp_fc_timeout);
                 display.display();
                 sys.display_updated = millis();
+                
+                
             }
         }
     }
@@ -832,25 +952,24 @@ void loop() {
 
             sys.num_peers = count_peers();
 
-            if (sys.num_peers >= LORA_NODES_MAX || sys.io_button_released > 0) {
+            if (sys.num_peers >= cfg.lora_nodes_max) {
                 sys.lora_no_tx = 1;
-                sys.display_page = 0;
             }
             else {
-//                cfg.lora_cycle =  cfg.lora_slot_spacing * cfg.lora_air_mode;
                 pick_id();
             }
-
+            sys.display_page = 0;
             sys.phase = MODE_LORA_SYNC;
 
         } else { // Still scanning
-            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) && sys.display_enable) {
-                for (int i = 0; i < LORA_NODES_MAX; i++) {
+            if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
+                for (int i = 0; i < cfg.lora_nodes_max; i++) {
                     if (peers[i].id > 0) {
                         display.drawString(40 + peers[i].id * 8, 18, String(peer_slotname[peers[i].id]));
                     }
                 }
                 display.drawProgressBar(40, 53, 86, 6, 100 * (millis() - sys.cycle_scan_begin) / cfg.cycle_scan);
+
                 display.display();
                 sys.display_updated = millis();
             }
@@ -876,7 +995,6 @@ void loop() {
         stats.packets_total = 0;
         stats.packets_received = 0;
         stats.percent_received = 0;
-
         digitalWrite(LED, LOW);
 
         sys.phase = MODE_LORA_RX;
@@ -886,8 +1004,6 @@ void loop() {
 
     if ((sys.phase == MODE_LORA_RX) && (sys.now > sys.lora_next_tx)) {
 
-        // sys.lora_last_tx = sys.lora_next_tx;
-
         while (sys.now > sys.lora_next_tx) { // In  case we skipped some beats
             sys.lora_next_tx += cfg.lora_cycle;
         }
@@ -896,11 +1012,21 @@ void loop() {
             sprintf(sys.message, "%s", "SILENT MODE (NO TX)");
         }
         else {
+
+/*            if (sys.num_peers_active == 0) {
+                sys.lora_next_tx += 3 * cfg.lora_cycle;
+                sprintf(sys.message, "%s", "SLOW MODE");
+            }
+
+            if (sys.num_peers == 0) { //
+                sys.lora_next_tx += random(-1, 1) * cfg.lora_slot_spacing;
+                sprintf(sys.message, "%s", "SLOW MODE + RAND");
+            }
+*/
             sys.phase = MODE_LORA_TX;
         }
 
     sys.lora_tick++;
-
     }
 
 // ---------------------- LORA TX
@@ -949,14 +1075,27 @@ void loop() {
     if ((sys.now > sys.display_updated + cfg.cycle_display) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
 
         stats.timer_begin = millis();
+
+        if (sys.num_peers == 0 && sys.display_page == 1)  { // No need for timings graphs when alone
+            sys.display_page++;
+        }        
+        
+        if (sys.display_page >= (3 + cfg.lora_nodes_max)) {
+            sys.display_page = 0;
+        }        
+        
         display_draw();
+        
+        sys.air_last_received_id = 0;
+        sys.message[0] = 0;
+        
         stats.last_oled_duration = millis() - stats.timer_begin;
         sys.display_updated = sys.now;
     }
 
 // ---------------------- SERIAL / MSP
 
-    if (sys.now > sys.msp_next_cycle && curr.host != HOST_NONE && sys.phase > MODE_LORA_SYNC && sys.lora_slot < LORA_NODES_MAX) {
+    if (sys.now > sys.msp_next_cycle && curr.host != HOST_NONE && sys.phase > MODE_LORA_SYNC && sys.lora_slot < cfg.lora_nodes_max) {
 
         stats.timer_begin = millis();
 
@@ -978,7 +1117,6 @@ void loop() {
         stats.last_msp_duration[sys.lora_slot] = millis() - stats.timer_begin;
         sys.msp_next_cycle += cfg.lora_slot_spacing;
         sys.lora_slot++;
-
     }
 
 
@@ -991,11 +1129,11 @@ void loop() {
 
         // Timed-out peers + LQ
 
-        for (int i = 0; i < LORA_NODES_MAX; i++) {
+        for (int i = 0; i < cfg.lora_nodes_max; i++) {
 
             if (sys.now > (peers[i].lq_updated +  cfg.lora_cycle * 4)) {
                 uint16_t diff = peers[i].updated - peers[i].lq_updated;
-                peers[i].lq = constrain(peers[i].lq_tick * 4.4 * cfg.lora_cycle / diff, 0, 4);
+                peers[i].lq = constrain(peers[i].lq_tick * 4.2 * cfg.lora_cycle / diff, 0, 4);
                 peers[i].lq_updated = sys.now;
                 peers[i].lq_tick = 0;
             }
@@ -1010,14 +1148,6 @@ void loop() {
         stats.packets_total += sys.num_peers_active * cfg.cycle_stats / cfg.lora_cycle;
         stats.packets_received += sys.pps;
         stats.percent_received = (stats.packets_received > 0) ? constrain(100 * stats.packets_received / stats.packets_total, 0 ,100) : 0;
-
-/*
-        if (sys.num_peers >= (cfg.lora_air_mode - 1)&& (cfg.lora_air_mode < LORA_NODES_MAX)) {
-            cfg.lora_air_mode++;
-            sys.lora_next_tx += cfg.lora_slot_spacing ;
-            cfg.lora_cycle =  cfg.lora_slot_spacing * cfg.lora_air_mode;
-            }
- */
 
         // Screen management
 

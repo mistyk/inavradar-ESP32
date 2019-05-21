@@ -1,20 +1,20 @@
 #define VERSION "1.4"
 
-#define MODE_HOST_SCAN   0
-#define MODE_LORA_INIT   1
-#define MODE_LORA_SYNC   2
-#define MODE_LORA_RX     3
-#define MODE_LORA_TX     4
+#define MODE_START       0
+#define MODE_MENU        1
+#define MODE_HOST_SCAN   2
+#define MODE_LORA_INIT   3
+#define MODE_LORA_SYNC   4
+#define MODE_LORA_RX     5
+#define MODE_LORA_TX     6
 
 #define LORA_NAME_LENGTH 6
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
-#define LORA_PERF_MODE 0
-
-#define LORA_NODES_MIN 2
-#define LORA_NODES_MAX 4
+#define LORA_AIR_MODE_DEFAULT 2
+#define LORA_NODES_MAX 8
 
 #define LED 2
 #define IO_LEDBLINK_DURATION 160
@@ -120,7 +120,6 @@ struct config_t {
 
     uint8_t lora_air_mode;
 
-    uint8_t msp_version;
     uint8_t msp_timeout;
     uint16_t msp_fc_timeout;
     uint16_t msp_after_tx_delay;
@@ -162,6 +161,10 @@ struct system_t {
     bool io_button_pressed = 0;
 
     uint32_t cycle_scan_begin;
+    uint32_t menu_begin;
+    uint16_t menu_timeout = 4000;
+    uint8_t menu_line = 1;
+
     uint32_t io_led_changestate;
     uint8_t io_led_count;
     uint8_t io_led_blink;
@@ -226,4 +229,25 @@ const uint8_t icon_lq_4[] PROGMEM = {
     B00000011
 };
 
+const uint8_t icon_sq0[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,   
+    B01010101,
+};
+
+const uint8_t icon_sq1[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+};
 
