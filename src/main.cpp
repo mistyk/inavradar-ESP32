@@ -34,8 +34,6 @@ air_type3_t * air_r3;
 
 // -------- SYSTEM
 
-
-
 int count_peers(bool active = 0) {
     int j = 0;
     for (int i = 0; i < cfg.lora_nodes_max; i++) {
@@ -411,13 +409,8 @@ void display_init() {
 
 void display_draw() {
     display.clear();
-
     int j = 0;
     int line;
-
-    if (sys.num_peers == 0 && sys.display_page == 1)  { // No need for timings graphs when alone
-        sys.display_page++;
-    }
 
     if (sys.display_page == 0) {
 
@@ -546,7 +539,8 @@ void display_draw() {
     }
     else if (sys.display_page >= 3) {
 
-        int i = constrain(sys.display_page + 1 - cfg.lora_nodes_max, 0, cfg.lora_nodes_max - 1);
+  //      int i = constrain(sys.display_page + 1 - cfg.lora_nodes_max, 0, cfg.lora_nodes_max - 1);
+        int i = constrain(sys.display_page - 3, 0, cfg.lora_nodes_max - 1);
         bool iscurrent = (i + 1 == curr.id);
 
         display.setFont(ArialMT_Plain_24);
@@ -576,7 +570,7 @@ void display_draw() {
                 else if (peers[i].lq == 4) { display.drawXbm(19, 2, 8, 8, icon_lq_4); }
 
                 if (iscurrent) {
-                    display.drawString (19, 0, "<HOST>");
+                    display.drawString (19, 0, "HOST");
                     display.drawString (19, 12, String(host_name[curr.host]));
                 }
                 else {
@@ -648,19 +642,18 @@ void display_draw() {
         }
         else {
             display.drawString (35, 7, "SLOT IS EMPTY");
+            sys.display_page++;
         }
 
     }
 
-    sys.air_last_received_id = 0;
-    sys.message[0] = 0;
     display.display();
 }
 
 void display_logo() {
     display.drawXbm(0, 0, logo_width_s, logo_height_s, logo_bits_s);
     display.display();
-    delay(1500);
+    delay(1200);
     display.clear();
 }
 
@@ -746,13 +739,7 @@ void IRAM_ATTR handleInterrupt() {
         sys.io_button_pressed = 1;
 
         if (sys.phase > MODE_LORA_SYNC) {
-
-            if (sys.display_page >= 3 + cfg.lora_nodes_max) {
-                sys.display_page = 0;
-            }
-            else {
-                sys.display_page++;
-            }
+            sys.display_page++;
         }
         else if (sys.phase == MODE_MENU) {
             sys.menu_line++;
@@ -781,6 +768,10 @@ void setup() {
     display_init();
     display_logo();
 
+//            lora_set_mode(cfg.lora_air_mode);
+//lora_set_mode(2);
+//            lora_init();    
+    
     msp.begin(Serial1);
     Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
     reset_peers();
@@ -826,10 +817,13 @@ void loop() {
                 cfg.lora_air_mode = sys.menu_line;
             }
 
+            lora_set_mode(cfg.lora_air_mode);
+            lora_init();    
+            
             display.clear();
             display.drawString(0, 0, "RADAR VERSION");
             display.drawString(90, 0, VERSION);
-            display.drawString (0, 9, "HOST");
+            display.drawString(0, 9, "HOST");
             display.display();
 
             sys.cycle_scan_begin = millis();
@@ -860,19 +854,19 @@ void loop() {
 
                 display.drawXbm (36, 25, 8, 8, icon_sq1);
                 display.drawXbm (44, 25, 8, 8, icon_sq1);
-                display.drawXbm (52, 25, 8, 8, icon_sq0);
+//                display.drawXbm (52, 25, 8, 8, icon_sq0);
 
                 display.drawXbm (36, 37, 8, 8, icon_sq1);
-                display.drawXbm (44, 37, 8, 8, icon_sq0);
-                display.drawXbm (52, 37, 8, 8, icon_sq0);
+//                display.drawXbm (44, 37, 8, 8, icon_sq0);
+//                display.drawXbm (52, 37, 8, 8, icon_sq0);
 
                 display.drawXbm (70, 13, 8, 8, icon_sq1);
-                display.drawXbm (78, 13, 8, 8, icon_sq0);
-                display.drawXbm (86, 13, 8, 8, icon_sq0);
+//                display.drawXbm (78, 13, 8, 8, icon_sq0);
+//                display.drawXbm (86, 13, 8, 8, icon_sq0);
 
                 display.drawXbm (70, 25, 8, 8, icon_sq1);
                 display.drawXbm (78, 25, 8, 8, icon_sq1);
-                display.drawXbm (86, 25, 8, 8, icon_sq0);
+//                display.drawXbm (86, 25, 8, 8, icon_sq0);
 
                 display.drawXbm (70, 37, 8, 8, icon_sq1);
                 display.drawXbm (78, 37, 8, 8, icon_sq1);
@@ -922,9 +916,9 @@ void loop() {
 
             display.drawProgressBar(0, 53, 40, 6, 100);
             display.display();
-
-            lora_set_mode(cfg.lora_air_mode);
-            lora_init();
+     
+//            delay (2000);
+            
             LoRa.sleep();
             LoRa.receive();
 
@@ -1081,7 +1075,20 @@ void loop() {
     if ((sys.now > sys.display_updated + cfg.cycle_display) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
 
         stats.timer_begin = millis();
+
+        if (sys.num_peers == 0 && sys.display_page == 1)  { // No need for timings graphs when alone
+            sys.display_page++;
+        }        
+        
+        if (sys.display_page >= (3 + cfg.lora_nodes_max)) {
+            sys.display_page = 0;
+        }        
+        
         display_draw();
+        
+        sys.air_last_received_id = 0;
+        sys.message[0] = 0;
+        
         stats.last_oled_duration = millis() - stats.timer_begin;
         sys.display_updated = sys.now;
     }
