@@ -20,14 +20,17 @@ MSP msp;
 
 msp_radar_pos_t radarPos;
 
-curr_t curr; // Our peer ID
-peer_t peers[LORA_NODES_MAX]; // Other peers
+curr_t curr;
+peer_t peers[LORA_NODES_MAX];
 
 air_type0_t air_0;
 air_type1_t air_1;
 air_type2_t air_2;
+air_type3_t air_3;
+
 air_type1_t * air_r1;
 air_type2_t * air_r2;
+air_type3_t * air_r3;
 
 // -------- SYSTEM
 
@@ -207,42 +210,58 @@ void lora_send() {
     if (sys.lora_tick % 8 == 0) {
 
         if (sys.lora_tick % 16 == 0) {
-            air_2.id = curr.id;
-            air_2.type = 2;
-            air_2.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
-            air_2.mah = curr.fcanalog.mAhDrawn;
-            air_2.rssi = curr.fcanalog.rssi; // 0 to 1023
+            air_3.id = curr.id;
+            air_3.type = 3;
+            air_3.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
+            air_3.mah = curr.fcanalog.mAhDrawn;
+            air_3.rssi = curr.fcanalog.rssi; // 0 to 1023
+            air_3.temp1 = 0;
+            air_3.temp2 = 0;
 
             while (!LoRa.beginPacket()) {  }
-            LoRa.write((uint8_t*)&air_2, sizeof(air_2));
+            LoRa.write((uint8_t*)&air_3, sizeof(air_3));
             LoRa.endPacket(false);
         }
         else {
-            air_1.id = curr.id;
-            air_1.type = 1;
-            air_1.host = curr.host;
-            air_1.state = curr.state;
-            air_1.broadcast = 0;
-            air_1.speed = curr.gps.groundSpeed / 100; // From cm/s to m/s
-            strncpy(air_1.name, curr.name, LORA_NAME_LENGTH);
+            air_2.id = curr.id;
+            air_2.type = 2;
+            air_2.host = curr.host;
+            air_2.state = curr.state;
+            strncpy(air_2.name, curr.name, LORA_NAME_LENGTH);
+            air_2.temp1 = 0;
 
             while (!LoRa.beginPacket()) {  }
-            LoRa.write((uint8_t*)&air_1, sizeof(air_1));
+            LoRa.write((uint8_t*)&air_2, sizeof(air_2));
             LoRa.endPacket(false);
             }
     }
     else {
 
-        air_0.id = curr.id;
-        air_0.type = 0;
-        air_0.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
-        air_0.lon = curr.gps.lon / 100; // From XX.1234567 to XX.12345
-        air_0.alt = curr.gps.alt; // m
-        air_0.heading = curr.gps.groundCourse / 10;  // From degres x 10 to degres
+        if (sys.lora_tick % 2 == 0) {
+            air_0.id = curr.id;
+            air_0.type = 0;
+            air_0.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
+            air_0.lon = curr.gps.lon / 100; // From XX.1234567 to XX.12345
+            air_0.alt = curr.gps.alt; // m
+            air_0.heading = curr.gps.groundCourse / 10;  // From degres x 10 to degres
 
-        while (!LoRa.beginPacket()) {  }
-        LoRa.write((uint8_t*)&air_0, sizeof(air_0));
-        LoRa.endPacket(false);
+            while (!LoRa.beginPacket()) {  }
+            LoRa.write((uint8_t*)&air_0, sizeof(air_0));
+            LoRa.endPacket(false);
+        }
+        else {
+            air_1.id = curr.id;
+            air_1.type = 1;
+            air_1.lat = curr.gps.lat / 100; // From XX.1234567 to XX.12345
+            air_1.lon = curr.gps.lon / 100; // From XX.1234567 to XX.12345
+            air_1.alt = curr.gps.alt; // m
+            air_1.speed = curr.gps.groundSpeed / 100; // From cm/s to m/s
+            air_1.broadcast = 0;
+
+            while (!LoRa.beginPacket()) {  }
+            LoRa.write((uint8_t*)&air_1, sizeof(air_1));
+            LoRa.endPacket(false);
+        }
     }
 }
 
@@ -266,41 +285,47 @@ void lora_receive(int packetSize) {
     peers[id].updated = sys.lora_last_rx;
     peers[id].rssi = sys.last_rssi;
 
-    if (air_0.type == 1) { // Type 1 packet (Speed + host + state + broadcast + name)
-
-        air_r1 = (air_type1_t*)&air_0;
-
-        peers[id].host = (*air_r1).host;
-        peers[id].state = (*air_r1).state;
-        peers[id].broadcast = (*air_r1).broadcast;
-        peers[id].gps.groundSpeed = (*air_r1).speed * 100; // From m/s to cm/s
-        strncpy(peers[id].name, (*air_r1).name, LORA_NAME_LENGTH);
-        peers[id].name[LORA_NAME_LENGTH] = 0;
-
-    }
-    else if (air_0.type == 2) { // Type 2 packet (vbat mAh RSSI)
-
-        air_r2 = (air_type2_t*)&air_0;
-
-        peers[id].fcanalog.vbat = (*air_r2).vbat;
-        peers[id].fcanalog.mAhDrawn = (*air_r2).mah;
-        peers[id].fcanalog.rssi = (*air_r2).rssi;
-
-    }
-    else { // Type 0 packet (GPS + heading)
+    if (air_0.type == 0) { // Type 0 packet
 
         peers[id].gps.lat = air_0.lat * 100; // From XX.12345 to XX.1234500
         peers[id].gps.lon = air_0.lon * 100; // From XX.12345 to XX.1234500
         peers[id].gps.alt = air_0.alt; // m
         peers[id].gps.groundCourse = air_0.heading * 10; // From degres to degres x 10
+    }
+    else if (air_0.type == 1) { // Type 1 packet
 
-        if (peers[id].gps.lat != 0 && peers[id].gps.lon != 0) { // Save the last known coordinates
-            peers[id].gpsrec.lat = peers[id].gps.lat;
-            peers[id].gpsrec.lon = peers[id].gps.lon;
-            peers[id].gpsrec.alt = peers[id].gps.alt;
-            peers[id].gpsrec.groundCourse = peers[id].gps.groundCourse;
-            peers[id].gpsrec.groundSpeed = peers[id].gps.groundSpeed;
-        }
+        air_r1 = (air_type1_t*)&air_0;
+
+        peers[id].gps.lat = (*air_r1).lat * 100; // From XX.12345 to XX.1234500
+        peers[id].gps.lon = (*air_r1).lon * 100; // From XX.12345 to XX.1234500
+        peers[id].gps.alt = (*air_r1).alt; // m
+        peers[id].gps.groundSpeed = (*air_r1).speed * 100; // From m/s to cm/s
+        peers[id].broadcast = (*air_r1).broadcast;
+    }
+    else if (air_0.type == 2) { // Type 2 packet
+
+        air_r2 = (air_type2_t*)&air_0;
+
+        peers[id].host = (*air_r2).host;
+        peers[id].state = (*air_r2).state;
+        strncpy(peers[id].name, (*air_r2).name, LORA_NAME_LENGTH);
+        peers[id].name[LORA_NAME_LENGTH] = 0;
+    }
+    else if (air_0.type == 3) { // Type 3 packet
+
+        air_r3 = (air_type3_t*)&air_0;
+
+        peers[id].fcanalog.vbat = (*air_r3).vbat;
+        peers[id].fcanalog.mAhDrawn = (*air_r3).mah;
+        peers[id].fcanalog.rssi = (*air_r3).rssi;
+    }
+
+    if ((air_0.type == 0 || air_0.type == 1) && peers[id].gps.lat != 0 && peers[id].gps.lon != 0 && peers[id].gps.alt != 0) {  // Save the last known coordinates
+        peers[id].gpsrec.lat = peers[id].gps.lat;
+        peers[id].gpsrec.lon = peers[id].gps.lon;
+        peers[id].gpsrec.alt = peers[id].gps.alt;
+        peers[id].gpsrec.groundCourse = peers[id].gps.groundCourse;
+        peers[id].gpsrec.groundSpeed = peers[id].gps.groundSpeed;
     }
 
     sys.num_peers = count_peers();

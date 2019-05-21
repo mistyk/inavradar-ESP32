@@ -1,4 +1,4 @@
-#define VERSION "1.3"
+#define VERSION "1.4"
 
 #define MODE_HOST_SCAN   0
 #define MODE_LORA_INIT   1
@@ -66,33 +66,41 @@ struct curr_t {
 };
 
 struct air_type0_t { // 80 bits
-    unsigned int id : 3;
+    unsigned int id : 4;
     unsigned int type : 3;
     signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
     signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
-    signed int alt : 14; // -8192m to +8192m
+    unsigned int alt : 13; // 0 to +8192m 
     unsigned int heading : 9; // 0 to 511°
 };
 
 struct air_type1_t { // 80 bits
-    unsigned int id : 3;
+    unsigned int id : 4;
+    unsigned int type : 3;
+    signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
+    signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
+    unsigned int alt : 13; // 0 to +8192m 
+    unsigned int speed : 6; //0 to 64m/s 230km/h
+    unsigned int broadcast : 3; // Not in use	
+};
+
+struct air_type2_t { // 80 bits
+    unsigned int id : 4;
     unsigned int type : 3;
     unsigned int host : 3;
     unsigned int state : 3;
-    unsigned int broadcast : 6;
-    unsigned int speed : 6; // 64m/s
     char name[LORA_NAME_LENGTH]; // 6 char x 8 bits = 48
-    unsigned int temp1 : 8; // Spare
+    unsigned int temp1 : 19; // Spare
     };
 
-struct air_type2_t { // 80 bits
-    unsigned int id : 3;
+struct air_type3_t { // 80 bits
+    unsigned int id : 4;
     unsigned int type : 3;
     unsigned int vbat : 8;
     unsigned int mah : 16;
     unsigned int rssi : 10;
     unsigned int temp1 : 20; // Spare
-    unsigned int temp2 : 20; // Spare
+    unsigned int temp2 : 19; // Spare
     };
 
 
