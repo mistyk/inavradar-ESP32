@@ -1,20 +1,20 @@
-#define VERSION "1.3"
+#define VERSION "1.4"
 
-#define MODE_HOST_SCAN   0
-#define MODE_LORA_INIT   1
-#define MODE_LORA_SYNC   2
-#define MODE_LORA_RX     3
-#define MODE_LORA_TX     4
+#define MODE_START       0
+#define MODE_MENU        1
+#define MODE_HOST_SCAN   2
+#define MODE_LORA_INIT   3
+#define MODE_LORA_SYNC   4
+#define MODE_LORA_RX     5
+#define MODE_LORA_TX     6
 
 #define LORA_NAME_LENGTH 6
 
 #define SERIAL_PIN_TX 23
 #define SERIAL_PIN_RX 17
 
-#define LORA_PERF_MODE 0
-
-#define LORA_NODES_MIN 2
-#define LORA_NODES_MAX 4
+#define LORA_AIR_MODE_DEFAULT 2
+#define LORA_NODES_MAX 8
 
 #define LED 2
 #define IO_LEDBLINK_DURATION 160
@@ -66,33 +66,41 @@ struct curr_t {
 };
 
 struct air_type0_t { // 80 bits
-    unsigned int id : 3;
+    unsigned int id : 4;
     unsigned int type : 3;
     signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
     signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
-    signed int alt : 14; // -8192m to +8192m
+    unsigned int alt : 13; // 0 to +8192m 
     unsigned int heading : 9; // 0 to 511°
 };
 
 struct air_type1_t { // 80 bits
-    unsigned int id : 3;
+    unsigned int id : 4;
+    unsigned int type : 3;
+    signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
+    signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
+    unsigned int alt : 13; // 0 to +8192m 
+    unsigned int speed : 6; //0 to 64m/s 230km/h
+    unsigned int broadcast : 3; // Not in use	
+};
+
+struct air_type2_t { // 80 bits
+    unsigned int id : 4;
     unsigned int type : 3;
     unsigned int host : 3;
     unsigned int state : 3;
-    unsigned int broadcast : 6;
-    unsigned int speed : 6; // 64m/s
     char name[LORA_NAME_LENGTH]; // 6 char x 8 bits = 48
-    unsigned int temp1 : 8; // Spare
+    unsigned int temp1 : 19; // Spare
     };
 
-struct air_type2_t { // 80 bits
-    unsigned int id : 3;
+struct air_type3_t { // 80 bits
+    unsigned int id : 4;
     unsigned int type : 3;
     unsigned int vbat : 8;
     unsigned int mah : 16;
     unsigned int rssi : 10;
     unsigned int temp1 : 20; // Spare
-    unsigned int temp2 : 20; // Spare
+    unsigned int temp2 : 19; // Spare
     };
 
 
@@ -112,7 +120,6 @@ struct config_t {
 
     uint8_t lora_air_mode;
 
-    uint8_t msp_version;
     uint8_t msp_timeout;
     uint16_t msp_fc_timeout;
     uint16_t msp_after_tx_delay;
@@ -154,6 +161,10 @@ struct system_t {
     bool io_button_pressed = 0;
 
     uint32_t cycle_scan_begin;
+    uint32_t menu_begin;
+    uint16_t menu_timeout = 4000;
+    uint8_t menu_line = 1;
+
     uint32_t io_led_changestate;
     uint8_t io_led_count;
     uint8_t io_led_blink;
@@ -218,4 +229,25 @@ const uint8_t icon_lq_4[] PROGMEM = {
     B00000011
 };
 
+const uint8_t icon_sq0[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,
+    B00000000,   
+    B01010101,
+};
+
+const uint8_t icon_sq1[] PROGMEM = {
+    B00000000,
+    B00000000,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+    B01111111,
+};
 
