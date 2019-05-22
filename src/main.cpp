@@ -5,7 +5,6 @@
 #include <SSD1306.h>
 #include <EEPROM.h>
 #include <main.h>
-#include <inavradarlogo.h>
 #include <math.h>
 #include <cmath>
 
@@ -84,7 +83,7 @@ void resync_tx_slot(int16_t delay) {
     bool startnow = 0;
     for (int i = 0; (i < cfg.lora_nodes_max) && (startnow == 0); i++) { // Resync
         if (peers[i].id > 0) {
-            sys.lora_next_tx = peers[i].updated + (curr.id - peers[i].id) * cfg.lora_slot_spacing + cfg.lora_cycle + delay;
+            sys.lora_next_tx = peers[i].updated + (curr.id - peers[i].id) * cfg.lora_slot_spacing + sys.lora_cycle + delay;
             startnow = 1;
         }
     }
@@ -185,9 +184,7 @@ void lora_set_mode(uint8_t mode) {
 
         cfg.lora_slot_spacing = 125;
         cfg.lora_nodes_max = 4;
-
         cfg.lora_timing_delay = -60;
-        cfg.lora_peer_timeout = 6000;
         cfg.msp_after_tx_delay = 85;
 
         sys.lora_no_tx = 1; 
@@ -203,9 +200,7 @@ void lora_set_mode(uint8_t mode) {
 
         cfg.lora_slot_spacing = 60;
         cfg.lora_nodes_max = 6;
-
         cfg.lora_timing_delay = -30;
-        cfg.lora_peer_timeout = 4000;
         cfg.msp_after_tx_delay = 20;
 
         break;
@@ -218,9 +213,7 @@ void lora_set_mode(uint8_t mode) {
 
         cfg.lora_slot_spacing = 125;
         cfg.lora_nodes_max = 4;
-
         cfg.lora_timing_delay = -60;
-        cfg.lora_peer_timeout = 6000;
         cfg.msp_after_tx_delay = 75;
 
         break;
@@ -233,25 +226,13 @@ void lora_set_mode(uint8_t mode) {
 
         cfg.lora_slot_spacing = 300;
         cfg.lora_nodes_max = 3;
-
         cfg.lora_timing_delay = -60;
-        cfg.lora_peer_timeout = 8000;
         cfg.msp_after_tx_delay = 170;
 
         break;
     }
 
-    cfg.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
-    cfg.cycle_stats = cfg.lora_cycle * 2;
-
     cfg.lora_power = 20;
-    cfg.msp_timeout = 100;
-    cfg.msp_fc_timeout = 4000;
-    cfg.cycle_display = 250;
-    cfg.cycle_scan = 4000;
-
-    cfg.lora_antidrift_threshold = 5;
-    cfg.lora_antidrift_correction = 5;
 
 }
 
@@ -458,14 +439,9 @@ void display_draw() {
         display.drawString (55, 23, String(host_name[curr.host]));
         display.drawString (55, 44, "R" + String(cfg.lora_air_mode));
 
-/*
-        if (sys.air_last_received_id > 0) {
-            display.drawString (36 + sys.air_last_received_id * 8, 54, String(peer_slotname[sys.air_last_received_id]));
-        }
-*/
         for (int i = 0; i < cfg.lora_nodes_max; i++) {   
 
-            if (peers[i].id > 0 && peers[i].updated > millis() - cfg.lora_cycle) {
+            if (peers[i].id > 0 && peers[i].updated > millis() - sys.lora_cycle) {
                 display.drawString (44 + i * 8, 54, String(peer_slotname[peers[i].id]));
             }    
         }    
@@ -478,19 +454,18 @@ void display_draw() {
 
     else if (sys.display_page == 1) {
 
+        long pos[LORA_NODES_MAX];
+        long diff;    
+    
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
-
         display.drawHorizontalLine(0, 11, 128);
-
-        long pos[LORA_NODES_MAX];
-        long diff;
 
         for (int i = 0; i < cfg.lora_nodes_max ; i++) {
             if (peers[i].id > 0 && !peers[i].lost) {
                 diff = sys.lora_last_tx - peers[i].updated;
-                if (diff > 0 && diff < cfg.lora_cycle) {
-                    pos[i] = 128 - round(128 * diff / cfg.lora_cycle);
+                if (diff > 0 && diff < sys.lora_cycle) {
+                    pos[i] = 128 - round(128 * diff / sys.lora_cycle);
                 }
             }
             else {
@@ -498,7 +473,7 @@ void display_draw() {
             }
         }
 
-        int rect_l = stats.last_tx_duration * 128 / cfg.lora_cycle;
+        int rect_l = stats.last_tx_duration * 128 / sys.lora_cycle;
 
         for (int i = 0; i < cfg.lora_nodes_max; i++) {
 
@@ -510,7 +485,7 @@ void display_draw() {
             }
 
             if (peers[i].id > 0 && j < 4) {
-            line = j * 9 + 14;
+                line = j * 9 + 14;
 
                 display.drawString (0, line, String(peer_slotname[peers[i].id]));
                 display.drawString (12, line, String(peers[i].name));
@@ -526,7 +501,7 @@ void display_draw() {
                         display.drawString (127, line, "-");
                     }
                     else {
-                        display.drawString (119, line, String(cfg.lora_cycle + sys.lora_last_tx - peers[i].updated));
+                        display.drawString (119, line, String(sys.lora_cycle + sys.lora_last_tx - peers[i].updated));
                         display.drawString (127, line, "+");
 
                     }
@@ -558,7 +533,7 @@ void display_draw() {
         display.drawString (111, 0, String(stats.last_tx_duration));
         display.drawString (111, 10, String(stats.last_msp_duration[0]) + " / " + String(stats.last_msp_duration[1]) + " / " + String(stats.last_msp_duration[2]) + " / " + String(stats.last_msp_duration[3]));
         display.drawString (111, 20, String(stats.last_oled_duration));
-        display.drawString (111, 30, String(cfg.lora_cycle));
+        display.drawString (111, 30, String(sys.lora_cycle));
         display.drawString (111, 40, String(cfg.lora_nodes_max) + " x " + String(cfg.lora_slot_spacing));
         display.drawString (111, 50, String((int)millis() / 1000));
 
@@ -676,7 +651,7 @@ void display_draw() {
 }
 
 void display_logo() {
-    display.drawXbm(0, 0, logo_width_s, logo_height_s, logo_bits_s);
+    display.drawXbm(0, 0, LOGO_WIDTH, LOGO_HEIGHT, logo_bits_s);
     display.display();
     delay(1200);
     display.clear();
@@ -684,9 +659,7 @@ void display_logo() {
 
 // -------- MSP and FC
 
-
 void msp_get_state() {
-
     uint32_t planeModes;
     msp.getActiveModes(&planeModes);
     curr.state = bitRead(planeModes, 0);
@@ -774,7 +747,6 @@ void IRAM_ATTR handleInterrupt() {
             sys.menu_line = 0;
             }
         }
-
         sys.io_button_released = millis();
     }
     portEXIT_CRITICAL_ISR(&mux);
@@ -787,7 +759,7 @@ void setup() {
 
     sys.phase = MODE_START;
 
-    pinMode(LED, OUTPUT);
+    pinMode(cfg.io_pin_led, OUTPUT);
     sys.io_led_blink = 0;
 
     display_init();
@@ -833,6 +805,10 @@ void loop() {
             cfg.lora_air_mode = sys.menu_line;
 
             lora_set_mode(cfg.lora_air_mode);
+            
+            sys.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
+            sys.cycle_stats = sys.lora_cycle * 2;
+            
             lora_init();
 
             display.clear();
@@ -849,7 +825,7 @@ void loop() {
 
         }
         else { // Still in the menu
-            if (sys.now > sys.display_updated + cfg.cycle_display / 5) {
+            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 5) {
                 delay(50);
 
                 display.drawProgressBar(0, 2, 25, 6, 100 * (millis() - sys.menu_begin) / sys.menu_timeout);
@@ -896,7 +872,7 @@ void loop() {
 
     if (sys.phase == MODE_HOST_SCAN) {
 
-        if ((sys.now > (sys.cycle_scan_begin + cfg.msp_fc_timeout)) || (curr.host != HOST_NONE)) {  // End of the host scan
+        if ((sys.now > (sys.cycle_scan_begin + HOST_MSP_TIMEOUT)) || (curr.host != HOST_NONE)) {  // End of the host scan
 
             if (curr.host != HOST_NONE) {
                 msp_get_name();
@@ -936,13 +912,13 @@ void loop() {
             sys.phase = MODE_LORA_INIT;
 
         } else { // Still scanning
-            if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
+            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 2) {
 
                 delay(50);
 
                 msp_set_fc();
 
-                display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - sys.cycle_scan_begin) / cfg.msp_fc_timeout);
+                display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - sys.cycle_scan_begin) / HOST_MSP_TIMEOUT);
                 display.display();
                 sys.display_updated = millis();
             }
@@ -953,7 +929,7 @@ void loop() {
 
     if (sys.phase == MODE_LORA_INIT) {
 
-        if (sys.now > (sys.cycle_scan_begin + cfg.cycle_scan)) {  // End of the scan, set the ID then sync
+        if (sys.now > (sys.cycle_scan_begin + LORA_CYCLE_SCAN)) {  // End of the scan, set the ID then sync
 
             sys.num_peers = count_peers();
 
@@ -968,13 +944,13 @@ void loop() {
 
         } else { // Still scanning
 
-            if (sys.now > sys.display_updated + cfg.cycle_display / 2) {
+            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 2) {
                 for (int i = 0; i < cfg.lora_nodes_max; i++) {
                     if (peers[i].id > 0) {
                         display.drawString(40 + peers[i].id * 8, 18, String(peer_slotname[peers[i].id]));
                     }
                 }
-                display.drawProgressBar(40, 53, 86, 6, 100 * (millis() - sys.cycle_scan_begin) / cfg.cycle_scan);
+                display.drawProgressBar(40, 53, 86, 6, 100 * (millis() - sys.cycle_scan_begin) / LORA_CYCLE_SCAN);
 
                 display.display();
                 sys.display_updated = millis();
@@ -987,13 +963,13 @@ void loop() {
     if (sys.phase == MODE_LORA_SYNC) {
 
         if (sys.num_peers == 0 || sys.lora_no_tx) { // Alone or no_tx mode, start at will
-            sys.lora_next_tx = millis() + cfg.lora_cycle;
+            sys.lora_next_tx = millis() + sys.lora_cycle;
             }
         else { // Not alone, sync by slot
             resync_tx_slot(cfg.lora_timing_delay);
         }
-        sys.display_updated = sys.lora_next_tx + cfg.lora_cycle - 30;
-        sys.stats_updated = sys.lora_next_tx + cfg.lora_cycle - 15;
+        sys.display_updated = sys.lora_next_tx + sys.lora_cycle - 30;
+        sys.stats_updated = sys.lora_next_tx + sys.lora_cycle - 15;
 
         sys.pps = 0;
         sys.ppsc = 0;
@@ -1001,7 +977,7 @@ void loop() {
         stats.packets_total = 0;
         stats.packets_received = 0;
         stats.percent_received = 0;
-        digitalWrite(LED, LOW);
+        digitalWrite(cfg.io_pin_led, LOW);
 
         sys.phase = MODE_LORA_RX;
         }
@@ -1011,21 +987,18 @@ void loop() {
     if ((sys.phase == MODE_LORA_RX) && (sys.now > sys.lora_next_tx)) {
 
         while (sys.now > sys.lora_next_tx) { // In  case we skipped some beats
-            sys.lora_next_tx += cfg.lora_cycle;
+            sys.lora_next_tx += sys.lora_cycle;
         }
 
         if (sys.lora_no_tx) {
             sprintf(sys.message, "%s", "SILENT MODE (NO TX)");
         }
         else {
-
             if (sys.num_peers == 0) {
                 sys.lora_next_tx += random(0, 2) * cfg.lora_slot_spacing;
                 }
-
             sys.phase = MODE_LORA_TX;
         }
-
     sys.lora_tick++;
     }
 
@@ -1052,8 +1025,8 @@ void loop() {
             if (peers[prev].id > 0) {
                 sys.lora_drift = sys.lora_last_tx - peers[prev].updated - cfg.lora_slot_spacing;
 
-                if ((abs(sys.lora_drift) > cfg.lora_antidrift_threshold) && (abs(sys.lora_drift) < (cfg.lora_slot_spacing * 0.5))) {
-                    sys.drift_correction = constrain(sys.lora_drift, -cfg.lora_antidrift_correction, cfg.lora_antidrift_correction);
+                if ((abs(sys.lora_drift) > LORA_DRIFT_THRESHOLD) && (abs(sys.lora_drift) < cfg.lora_slot_spacing)) {
+                    sys.drift_correction = constrain(sys.lora_drift, -LORA_DRIFT_CORRECTION, LORA_DRIFT_CORRECTION);
                     sys.lora_next_tx -= sys.drift_correction;
                     sprintf(sys.message, "%s %3d", "TIMING ADJUST", -sys.drift_correction);
                 }
@@ -1067,12 +1040,13 @@ void loop() {
 
         LoRa.sleep();
         LoRa.receive();
+        
         sys.phase = MODE_LORA_RX;
     }
 
 // ---------------------- DISPLAY
 
-    if ((sys.now > sys.display_updated + cfg.cycle_display) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
+    if ((sys.now > sys.display_updated + DISPLAY_CYCLE) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
 
         stats.timer_begin = millis();
 
@@ -1086,7 +1060,6 @@ void loop() {
 
         display_draw();
 
-        sys.air_last_received_id = 0;
         sys.message[0] = 0;
 
         stats.last_oled_duration = millis() - stats.timer_begin;
@@ -1122,7 +1095,7 @@ void loop() {
 
 // ---------------------- STATISTICS & IO
 
-    if ((sys.now > (cfg.cycle_stats + sys.stats_updated)) && (sys.phase > MODE_LORA_SYNC)) {
+    if ((sys.now > (sys.cycle_stats + sys.stats_updated)) && (sys.phase > MODE_LORA_SYNC)) {
 
         sys.pps = sys.ppsc;
         sys.ppsc = 0;
@@ -1131,14 +1104,14 @@ void loop() {
 
         for (int i = 0; i < cfg.lora_nodes_max; i++) {
 
-            if (sys.now > (peers[i].lq_updated +  cfg.lora_cycle * 4)) {
+            if (sys.now > (peers[i].lq_updated +  sys.lora_cycle * 4)) {
                 uint16_t diff = peers[i].updated - peers[i].lq_updated;
-                peers[i].lq = constrain(peers[i].lq_tick * 4.2 * cfg.lora_cycle / diff, 0, 4);
+                peers[i].lq = constrain(peers[i].lq_tick * 4.2 * sys.lora_cycle / diff, 0, 4);
                 peers[i].lq_updated = sys.now;
                 peers[i].lq_tick = 0;
             }
 
-            if (peers[i].id > 0 && ((sys.now - peers[i].updated) > cfg.lora_peer_timeout)) {
+            if (peers[i].id > 0 && ((sys.now - peers[i].updated) > LORA_PEER_TIMEOUT)) {
                 peers[i].lost = 1;
             }
 
@@ -1148,7 +1121,7 @@ void loop() {
 
 //        sys.lora_slow_mode = (sys.num_peers_active == 0) ? 1 : 0;
 
-        stats.packets_total += sys.num_peers_active * cfg.cycle_stats / cfg.lora_cycle;
+        stats.packets_total += sys.num_peers_active * sys.cycle_stats / sys.lora_cycle;
         stats.packets_received += sys.pps;
         stats.percent_received = (stats.packets_received > 0) ? constrain(100 * stats.packets_received / stats.packets_total, 0 ,100) : 0;
 
@@ -1184,10 +1157,10 @@ void loop() {
         sys.io_led_changestate += IO_LEDBLINK_DURATION;
 
         if (sys.io_led_count % 2 == 0) {
-            digitalWrite(LED, LOW);
+            digitalWrite(cfg.io_pin_led, LOW);
         }
         else {
-            digitalWrite(LED, HIGH);
+            digitalWrite(cfg.io_pin_led, HIGH);
         }
 
         if (sys.io_led_count >= sys.num_peers_active * 2) {
