@@ -6,19 +6,21 @@
 #include <SSD1306.h>
 #include <EEPROM.h>
 #include <main.h>
+#include <pixel.h>
 #include <math.h>
 #include <cmath>
-
-
+#include <BluetoothSerial.h>
 #include <lib/cli.h>
-
 // -------- VARS
 
 SSD1306 display(0x3c, 4, 15);
+BluetoothSerial SerialBT;
 
 config_t cfg;
 system_t sys;
 stats_t stats;
+CLI * cli = new CLI;
+CLI * cliBT = new CLI;
 MSP msp;
 
 msp_radar_pos_t radarPos;
@@ -34,6 +36,10 @@ air_type3_t air_3;
 air_type1_t * air_r1;
 air_type2_t * air_r2;
 air_type3_t * air_r3;
+
+char host_name[3][5]={"NoFC", "iNav", "Beta"};
+char host_state[2][5]={"", "ARM"};
+char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
 
 // -------- EEPROM / CONFIG
 
@@ -742,6 +748,13 @@ void IRAM_ATTR handleInterrupt() {
 
 void setup() {
 
+    Serial.begin(115200);
+    cli->begin(Serial);
+
+    SerialBT.begin("INAV-Radar");
+    cliBT->begin(SerialBT);
+    //SerialBT.end();
+
     sys.phase = MODE_START;
 
     config_init();
@@ -758,8 +771,6 @@ void setup() {
         display.clear();
         display.display();
     }
-
-    Serial.begin(115200);
 
     msp.begin(Serial1);
     Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
@@ -787,8 +798,8 @@ void setup() {
         display.drawString(0, 9, "PROFILE " + String(cfg.profile_id) + " " + String(cfg.profile_name));
         display.drawString(0, 18, "HOST");
         display.display();
-    }    
-    
+    }
+
     sys.cycle_scan_begin = millis();
     sys.now = millis();
 
@@ -803,9 +814,9 @@ void loop() {
 
     sys.now = millis();
 
-    bool received = getCommandLineFromSerialPort(CommandLine);
-    if (received) runCommand(CommandLine);
+    cli->process();
 
+    cliBT->process();
 // ---------------------- IO BUTTON
 
     if ((sys.now > sys.io_button_released + 150) && (sys.io_button_pressed == 1)) {
