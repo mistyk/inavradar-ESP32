@@ -1,23 +1,7 @@
+// -------- GENERAL
+
 #define VERSION "1.4"
-
-#define HOST_MSP_TIMEOUT 4000
-
-#define HOST_NONE 0
-#define HOST_INAV 1
-#define HOST_BTFL 2
-
-char host_name[3][5]={"NoFC", "iNav", "Beta"};
-char host_state[2][5]={"", "ARM"};
-char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
-
-#define LORA_AIR_MODE_DEFAULT 2
-#define LORA_NODES_MAX 8
-#define LORA_NAME_LENGTH 6
-
-#define LORA_CYCLE_SCAN 4000
-#define LORA_PEER_TIMEOUT 6000
-#define LORA_DRIFT_THRESHOLD 5
-#define LORA_DRIFT_CORRECTION 5
+#define VERSION_CONFIG 140
 
 #define MODE_START       0
 #define MODE_MENU        1
@@ -26,6 +10,31 @@ char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
 #define MODE_LORA_SYNC   4
 #define MODE_LORA_RX     5
 #define MODE_LORA_TX     6
+
+// -------- HOST
+
+#define HOST_MSP_TIMEOUT 4000
+#define HOST_NONE 0
+#define HOST_INAV 1
+#define HOST_BTFL 2
+
+char host_name[3][5]={"NoFC", "iNav", "Beta"};
+char host_state[2][5]={"", "ARM"};
+char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
+
+#define CFG_PROFILE_DEFAULT_ID 1
+
+// -------- LORA
+
+#define LORA_NODES_MAX 8
+#define LORA_NAME_LENGTH 6
+
+#define LORA_CYCLE_SCAN 4000
+#define LORA_PEER_TIMEOUT 6000
+#define LORA_DRIFT_THRESHOLD 5
+#define LORA_DRIFT_CORRECTION 5
+
+// --------- IO AND DISPLAY
 
 #define DISPLAY_CYCLE 250
 #define IO_LEDBLINK_DURATION 160
@@ -39,6 +48,8 @@ char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
 #define SS 18 // GPIO18 - SX1278's CS
 #define RST 14 // GPIO14 - SX1278's RESET
 #define DI0 26 // GPIO26 - SX1278's IRQ (interrupt request)
+
+// -------- STRUCTURE
 
 struct peer_t {
    uint8_t id;
@@ -112,9 +123,12 @@ struct air_type3_t { // 80 bits
 
 struct config_t {
 
+
     // General
 
-    uint8_t lora_air_mode;
+    uint16_t version;
+    uint8_t profile_id;
+    char profile_name[15];
 
     // Radio
 
@@ -199,6 +213,8 @@ struct stats_t {
     uint16_t last_msp_duration[LORA_NODES_MAX];
     uint16_t last_oled_duration;
 };
+
+// -------- GRAPHICS
 
 const uint8_t icon_lq_1[] PROGMEM = {
     B00000000,

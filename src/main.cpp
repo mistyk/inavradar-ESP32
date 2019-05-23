@@ -2,11 +2,15 @@
 #include <esp_system.h>
 #include <lib/MSP.h>
 #include <lib/LoRa.h>
+
 #include <SSD1306.h>
 #include <EEPROM.h>
 #include <main.h>
 #include <math.h>
 #include <cmath>
+
+
+#include <lib/cli.h>
 
 // -------- VARS
 
@@ -30,6 +34,53 @@ air_type3_t air_3;
 air_type1_t * air_r1;
 air_type2_t * air_r2;
 air_type3_t * air_r3;
+
+// -------- EEPROM / CONFIG
+
+void config_save() {
+    for(size_t i = 0; i < sizeof(cfg); i++) {
+        char data = ((char *)&cfg)[i];
+        EEPROM.write(i, data);
+    }
+    EEPROM.commit();
+}
+
+void config_init() {
+
+    size_t size = sizeof(cfg);
+    EEPROM.begin(size * 2);
+
+    for(size_t i = 0; i < size; i++)  {
+        char data = EEPROM.read(i);
+        ((char *)&cfg)[i] = data;
+    }
+
+    if (cfg.version != VERSION_CONFIG) { // write default config
+        cfg.version = VERSION_CONFIG;
+        cfg.profile_id = CFG_PROFILE_DEFAULT_ID;
+        strcpy(cfg.profile_name, "Default");
+
+        cfg.lora_frequency = 433E6; // 433E6, 868E6, 915E6
+        cfg.lora_bandwidth = 250000;
+        cfg.lora_coding_rate = 5;
+        cfg.lora_spreading_factor = 9;
+        cfg.lora_power = 20;
+
+        cfg.lora_nodes_max = 4;
+        cfg.lora_slot_spacing = 125;
+        cfg.lora_timing_delay = -60;
+        cfg.msp_after_tx_delay = 85;
+
+        cfg.display_enable = 1;
+        cfg.io_pin_led = 2;
+
+        config_save();
+    }
+    else {
+        Serial.println("Configuration file found!");
+    }
+}
+
 
 // -------- SYSTEM
 
@@ -170,71 +221,6 @@ double gpsCourseTo(double lat1, double long1, double lat2, double long2)
 
 // -------- LoRa
 
-void lora_set_mode(uint8_t mode) {
-
-    cfg.lora_frequency = 433E6; // 433E6, 868E6, 915E6
-
-    switch (mode) {
-
-    case 0 : // SF9 250 SILENT NO TX
-
-        cfg.lora_spreading_factor = 9;
-        cfg.lora_bandwidth = 250000;
-        cfg.lora_coding_rate = 5;
-
-        cfg.lora_slot_spacing = 125;
-        cfg.lora_nodes_max = 4;
-        cfg.lora_timing_delay = -60;
-        cfg.msp_after_tx_delay = 85;
-
-        sys.lora_no_tx = 1; 
-        
-        break;    
-    
-    
-    case 1 : // SF7 250 6 x 60 = 360
-
-        cfg.lora_spreading_factor = 7;
-        cfg.lora_bandwidth = 250000;
-        cfg.lora_coding_rate = 5;
-
-        cfg.lora_slot_spacing = 60;
-        cfg.lora_nodes_max = 6;
-        cfg.lora_timing_delay = -30;
-        cfg.msp_after_tx_delay = 20;
-
-        break;
-
-    case 2 : // SF9 250 4 x 125 = 500
-
-        cfg.lora_spreading_factor = 9;
-        cfg.lora_bandwidth = 250000;
-        cfg.lora_coding_rate = 5;
-
-        cfg.lora_slot_spacing = 125;
-        cfg.lora_nodes_max = 4;
-        cfg.lora_timing_delay = -60;
-        cfg.msp_after_tx_delay = 75;
-
-        break;
-
-    case 3 : // SF10 250 3 x 300 = 1000
-
-        cfg.lora_spreading_factor = 10;
-        cfg.lora_bandwidth = 250000;
-        cfg.lora_coding_rate = 6;
-
-        cfg.lora_slot_spacing = 300;
-        cfg.lora_nodes_max = 3;
-        cfg.lora_timing_delay = -60;
-        cfg.msp_after_tx_delay = 170;
-
-        break;
-    }
-
-    cfg.lora_power = 20;
-
-}
 
 void lora_send() {
 
@@ -378,7 +364,6 @@ void lora_init() {
     LoRa.setPins(SS, RST, DI0);
 
     if (!LoRa.begin(cfg.lora_frequency)) {
-        display.drawString (94, 9, "FAIL");
         while (1);
     }
 
@@ -437,15 +422,15 @@ void display_draw() {
         display.drawString(21, 54, String(sys.pps) + "p/s");
         display.drawString (109, 54, "dB");
         display.drawString (55, 23, String(host_name[curr.host]));
-        display.drawString (55, 44, "R" + String(cfg.lora_air_mode));
+        display.drawString (55, 44, "P" + String(cfg.profile_id));
 
-        for (int i = 0; i < cfg.lora_nodes_max; i++) {   
+        for (int i = 0; i < cfg.lora_nodes_max; i++) {
 
             if (peers[i].id > 0 && peers[i].updated > millis() - sys.lora_cycle) {
                 display.drawString (44 + i * 8, 54, String(peer_slotname[peers[i].id]));
-            }    
-        }    
-        
+            }
+        }
+
         display.drawString (15, 44, "Nod/" + String(cfg.lora_nodes_max));
 
         if (curr.gps.fixType == 1) display.drawString (27, 12, "2D");
@@ -455,8 +440,8 @@ void display_draw() {
     else if (sys.display_page == 1) {
 
         long pos[LORA_NODES_MAX];
-        long diff;    
-    
+        long diff;
+
         display.setFont (ArialMT_Plain_10);
         display.setTextAlignment (TEXT_ALIGN_LEFT);
         display.drawHorizontalLine(0, 11, 128);
@@ -759,11 +744,22 @@ void setup() {
 
     sys.phase = MODE_START;
 
+    config_init();
+
+    sys.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
+    sys.cycle_stats = sys.lora_cycle * 2;
+
     pinMode(cfg.io_pin_led, OUTPUT);
     sys.io_led_blink = 0;
 
-    display_init();
-    display_logo();
+    if (cfg.display_enable) {
+        display_init();
+        display_logo();
+        display.clear();
+        display.display();
+    }
+
+    Serial.begin(115200);
 
     msp.begin(Serial1);
     Serial1.begin(115200, SERIAL_8N1, SERIAL_PIN_RX , SERIAL_PIN_TX);
@@ -773,14 +769,32 @@ void setup() {
     sys.io_button_pressed = 0;
     attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
 
-    display.clear();
-    display.display();
 
+/*
     sys.display_updated = 0;
-    sys.menu_line = LORA_AIR_MODE_DEFAULT;
+    sys.menu_line = CFG_PROFILE_DEFAULT;
+    sys.menu_line = 1; // ---------------------
     sys.menu_begin = millis();
-
     sys.phase = MODE_MENU;
+
+    */
+
+    lora_init();
+
+    if (cfg.display_enable) {
+        display.clear();
+        display.drawString(0, 0, "RADAR VERSION " + String(VERSION));
+        display.drawString(0, 9, "PROFILE " + String(cfg.profile_id) + " " + String(cfg.profile_name));
+        display.drawString(0, 18, "HOST");
+        display.display();
+    }    
+    
+    sys.cycle_scan_begin = millis();
+    sys.now = millis();
+
+    curr.host = HOST_NONE;
+    sys.phase = MODE_HOST_SCAN;
+
 }
 
 // ----------------------------------------------------------------------------- MAIN LOOP
@@ -789,84 +803,15 @@ void loop() {
 
     sys.now = millis();
 
+    bool received = getCommandLineFromSerialPort(CommandLine);
+    if (received) runCommand(CommandLine);
+
 // ---------------------- IO BUTTON
 
     if ((sys.now > sys.io_button_released + 150) && (sys.io_button_pressed == 1)) {
         sys.io_button_pressed = 0;
     }
 
-
-// ---------------------- MENU
-
-    if (sys.phase == MODE_MENU) {
-
-        if (sys.now > (sys.menu_begin + sys.menu_timeout)) {  // End of the menu
-
-            cfg.lora_air_mode = sys.menu_line;
-
-            lora_set_mode(cfg.lora_air_mode);
-            
-            sys.lora_cycle = cfg.lora_nodes_max * cfg.lora_slot_spacing;
-            sys.cycle_stats = sys.lora_cycle * 2;
-            
-            lora_init();
-
-            display.clear();
-            display.drawString(0, 0, "RADAR VERSION");
-            display.drawString(90, 0, VERSION);
-            display.drawString(0, 9, "HOST");
-            display.display();
-
-            sys.cycle_scan_begin = millis();
-            sys.now = millis();
-
-            curr.host = HOST_NONE;
-            sys.phase = MODE_HOST_SCAN;
-
-        }
-        else { // Still in the menu
-            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 5) {
-                delay(50);
-
-                display.drawProgressBar(0, 2, 25, 6, 100 * (millis() - sys.menu_begin) / sys.menu_timeout);
-
-                display.drawString (33, 0, "Speed");
-                display.drawString (69, 0, "Range");
-                display.drawString (107, 0, "Max");
-                display.drawString (6, 12, "R0 Silent");
-                display.drawString (6, 24, "R1");
-                display.drawString (6, 36, "R2");
-                display.drawString (6, 48, "R3");
-                
-                display.drawXbm (36, 25, 8, 8, icon_sq1);
-                display.drawXbm (44, 25, 8, 8, icon_sq1);
-                display.drawXbm (52, 25, 8, 8, icon_sq1);
-                
-                display.drawXbm (36, 37, 8, 8, icon_sq1);
-                display.drawXbm (44, 37, 8, 8, icon_sq1);
-                
-                display.drawXbm (36, 49, 8, 8, icon_sq1);
-                
-                display.drawXbm (70, 25, 8, 8, icon_sq1);
-                
-                display.drawXbm (70, 37, 8, 8, icon_sq1);
-                display.drawXbm (78, 37, 8, 8, icon_sq1);
-                
-                display.drawXbm (70, 49, 8, 8, icon_sq1);
-                display.drawXbm (78, 49, 8, 8, icon_sq1);
-                display.drawXbm (86, 49, 8, 8, icon_sq1);
-                
-                display.drawString (116, 24, "6");
-                display.drawString (116, 36, "4");
-                display.drawString (116, 48, "3");
-
-                display.drawRect(0, (sys.menu_line + 1) * 12, 127, 12);
-
-                display.display();
-                sys.display_updated = millis();
-            }
-        }
-    }
 
 // ---------------------- HOST SCAN
 
@@ -891,22 +836,22 @@ void loop() {
             curr.gps.alt = 0;
             curr.id = 0;
 
-            if (curr.host > 0) {
-                display.drawString (35, 9, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
-            }
-            else {
-                display.drawString (35, 9, String(host_name[curr.host]));
-            }
-
-            display.drawProgressBar(0, 53, 40, 6, 100);
-            display.display();
-
             LoRa.sleep();
             LoRa.receive();
 
+        if (cfg.display_enable) {
+            if (curr.host > 0) {
+                display.drawString (35, 18, String(host_name[curr.host]) + " " + String(curr.fcversion.versionMajor) + "."  + String(curr.fcversion.versionMinor) + "." + String(curr.fcversion.versionPatchLevel));
+            }
+            else {
+                display.drawString (35, 18, String(host_name[curr.host]));
+            }
+
             display.drawProgressBar(0, 53, 40, 6, 100);
-            display.drawString (0, 18, "SCAN R" + String(cfg.lora_air_mode));
+            display.drawString (0, 27, "SCAN");
             display.display();
+
+        }
 
             sys.cycle_scan_begin = millis();
             sys.phase = MODE_LORA_INIT;
@@ -918,8 +863,10 @@ void loop() {
 
                 msp_set_fc();
 
+        if (cfg.display_enable) {
                 display.drawProgressBar(0, 53, 40, 6, 100 * (millis() - sys.cycle_scan_begin) / HOST_MSP_TIMEOUT);
                 display.display();
+        }
                 sys.display_updated = millis();
             }
         }
@@ -944,17 +891,18 @@ void loop() {
 
         } else { // Still scanning
 
-            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 2) {
+            if (sys.now > sys.display_updated + DISPLAY_CYCLE / 2 && cfg.display_enable) {
                 for (int i = 0; i < cfg.lora_nodes_max; i++) {
                     if (peers[i].id > 0) {
-                        display.drawString(40 + peers[i].id * 8, 18, String(peer_slotname[peers[i].id]));
+                        display.drawString(40 + peers[i].id * 8, 27, String(peer_slotname[peers[i].id]));
                     }
                 }
                 display.drawProgressBar(40, 53, 86, 6, 100 * (millis() - sys.cycle_scan_begin) / LORA_CYCLE_SCAN);
-
                 display.display();
+
                 sys.display_updated = millis();
             }
+        delay(20);
         }
     }
 
@@ -1040,13 +988,13 @@ void loop() {
 
         LoRa.sleep();
         LoRa.receive();
-        
+
         sys.phase = MODE_LORA_RX;
     }
 
 // ---------------------- DISPLAY
 
-    if ((sys.now > sys.display_updated + DISPLAY_CYCLE) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
+    if ((sys.now > sys.display_updated + DISPLAY_CYCLE) && sys.display_enable && (sys.phase > MODE_LORA_SYNC) && cfg.display_enable) {
 
         stats.timer_begin = millis();
 
