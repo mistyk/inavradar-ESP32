@@ -74,7 +74,7 @@ void config_init() {
 
         cfg.lora_nodes_max = 4;
         cfg.lora_slot_spacing = 125;
-        cfg.lora_timing_delay = -60;
+        cfg.lora_timing_delay = -70;
         cfg.msp_after_tx_delay = 85;
 
         cfg.display_enable = 1;
@@ -812,11 +812,11 @@ void setup() {
 
 void loop() {
 
-    sys.now = millis();
-
     cli->process();
-
     cliBT->process();
+    
+    sys.now = millis(); 
+
 // ---------------------- IO BUTTON
 
     if ((sys.now > sys.io_button_released + 150) && (sys.io_button_pressed == 1)) {
