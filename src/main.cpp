@@ -1072,8 +1072,11 @@ void loop() {
 
             if (peers[i].id > 0 && ((sys.now - peers[i].updated) > LORA_PEER_TIMEOUT)) {
                 peers[i].lost = 1;
+                
+                if ((sys.now - peers[i].updated) > LORA_PEER_TIMEOUT_LOST) {
+                    peers[i].state = 2;
+                }
             }
-
         }
 
         sys.num_peers_active = count_peers(1);
