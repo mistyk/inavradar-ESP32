@@ -2,6 +2,10 @@
 
 #define VERSION "1.4"
 #define VERSION_CONFIG 140
+#define FORCE_DEFAULT_PROFILE 1
+
+// #define USE_CLI
+// #define USE_BT
 
 #define MODE_START       0
 #define MODE_MENU        1

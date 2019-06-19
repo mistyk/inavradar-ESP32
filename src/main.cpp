@@ -11,17 +11,22 @@
 #include <cmath>
 #include <BluetoothSerial.h>
 #include <lib/cli.h>
-// -------- VARS
 
-SSD1306 display(0x3c, 4, 15);
-BluetoothSerial SerialBT;
+// -------- VARS
 
 config_t cfg;
 system_t sys;
 stats_t stats;
+MSP msp;
+
+#ifdef USE_CLI
 CLI * cli = new CLI;
 CLI * cliBT = new CLI;
-MSP msp;
+#endif
+
+#ifdef USE_BT
+BluetoothSerial SerialBT;
+#endif
 
 msp_radar_pos_t radarPos;
 
@@ -40,6 +45,8 @@ air_type3_t * air_r3;
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
 char host_state[2][5]={"", "ARM"};
 char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
+
+SSD1306 display(0x3c, 4, 15);
 
 // -------- EEPROM / CONFIG
 
@@ -61,7 +68,7 @@ void config_init() {
         ((char *)&cfg)[i] = data;
     }
 
-    if (cfg.version != VERSION_CONFIG) { // write default config
+    if (cfg.version != VERSION_CONFIG || FORCE_DEFAULT_PROFILE) { // write default config
         cfg.version = VERSION_CONFIG;
         cfg.profile_id = CFG_PROFILE_DEFAULT_ID;
         strcpy(cfg.profile_name, "Default");
@@ -748,12 +755,16 @@ void IRAM_ATTR handleInterrupt() {
 
 void setup() {
 
+    #ifdef USE_CLI
     Serial.begin(115200);
     cli->begin(Serial);
+    #endif
 
+    #ifdef USE_BT
     SerialBT.begin("INAV-Radar");
     cliBT->begin(SerialBT);
     //SerialBT.end();
+    #endif
 
     sys.phase = MODE_START;
 
@@ -812,10 +823,15 @@ void setup() {
 
 void loop() {
 
+    #ifdef USE_CLI
     cli->process();
+    #endif
+
+    #ifdef USE_BT
     cliBT->process();
-    
-    sys.now = millis(); 
+    #endif
+
+    sys.now = millis();
 
 // ---------------------- IO BUTTON
 
@@ -1072,7 +1088,7 @@ void loop() {
 
             if (peers[i].id > 0 && ((sys.now - peers[i].updated) > LORA_PEER_TIMEOUT)) {
                 peers[i].lost = 1;
-                
+
                 if ((sys.now - peers[i].updated) > LORA_PEER_TIMEOUT_LOST) {
                     peers[i].state = 2;
                 }
